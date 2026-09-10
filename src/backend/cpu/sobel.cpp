@@ -17,6 +17,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename Ti, typename To>
@@ -43,8 +44,10 @@ INSTANTIATE(double, double)
 INSTANTIATE(int, int)
 INSTANTIATE(uint, int)
 INSTANTIATE(char, int)
+INSTANTIATE(schar, int)
 INSTANTIATE(uchar, int)
 INSTANTIATE(short, int)
 INSTANTIATE(ushort, int)
 
 }  // namespace cpu
+}  // namespace arrayfire

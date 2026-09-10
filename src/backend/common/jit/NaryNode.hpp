@@ -14,19 +14,23 @@
 #include <common/defines.hpp>
 #include <common/jit/Node.hpp>
 
+#include <nonstd/span.hpp>
 #include <array>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <utility>
 
+namespace arrayfire {
 namespace common {
 
 class NaryNode : public Node {
    private:
     int m_num_children;
-    af_op_t m_op;
     const char *m_op_str;
+
+   protected:
+    af_op_t m_op;
 
    public:
     NaryNode(const af::dtype type, const char *op_str, const int num_children,
@@ -36,10 +40,11 @@ class NaryNode : public Node {
               type, height,
               std::forward<
                   const std::array<common::Node_ptr, Node::kMaxChildren>>(
-                  children))
+                  children),
+              kNodeType::Nary)
         , m_num_children(num_children)
-        , m_op(op)
-        , m_op_str(op_str) {
+        , m_op_str(op_str)
+        , m_op(op) {
         static_assert(std::is_nothrow_move_assignable<NaryNode>::value,
                       "NaryNode is not move assignable");
         static_assert(std::is_nothrow_move_constructible<NaryNode>::value,
@@ -60,8 +65,8 @@ class NaryNode : public Node {
         using std::swap;
         Node::swap(other);
         swap(m_num_children, other.m_num_children);
-        swap(m_op, other.m_op);
         swap(m_op_str, other.m_op_str);
+        swap(m_op, other.m_op);
     }
 
     af_op_t getOp() const noexcept final { return m_op; }
@@ -100,13 +105,15 @@ common::Node_ptr createNaryNode(
     const af::dim4 &odims, FUNC createNode,
     std::array<const detail::Array<Ti> *, N> &&children) {
     std::array<common::Node_ptr, N> childNodes;
+    std::array<common::Node *, N> nodes;
     for (int i = 0; i < N; i++) {
         childNodes[i] = move(children[i]->getNode());
+        nodes[i]      = childNodes[i].get();
     }
 
     common::Node_ptr ptr = createNode(childNodes);
 
-    switch (detail::passesJitHeuristics<Ti>(ptr.get())) {
+    switch (detail::passesJitHeuristics<Ti>(nodes)) {
         case kJITHeuristics::Pass: {
             return ptr;
         }
@@ -131,3 +138,4 @@ common::Node_ptr createNaryNode(
     return ptr;
 }
 }  // namespace common
+}  // namespace arrayfire

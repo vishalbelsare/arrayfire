@@ -24,11 +24,12 @@
 #include <vector>
 
 using af::dim4;
-using common::flip;
-using common::half;
-using common::modDims;
+using arrayfire::common::flip;
+using arrayfire::common::half;
+using arrayfire::common::modDims;
 using std::vector;
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T, typename accT>
@@ -97,6 +98,7 @@ INSTANTIATE(double, double)
 INSTANTIATE(float, float)
 INSTANTIATE(uint, float)
 INSTANTIATE(int, float)
+INSTANTIATE(schar, float)
 INSTANTIATE(uchar, float)
 INSTANTIATE(char, float)
 INSTANTIATE(ushort, float)
@@ -249,3 +251,4 @@ INSTANTIATE(half)
 #undef INSTANTIATE
 
 }  // namespace opencl
+}  // namespace arrayfire

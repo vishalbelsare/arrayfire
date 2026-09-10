@@ -1,6 +1,221 @@
 Release Notes {#releasenotes}
 ==============
 
+v3.10.0
+======
+
+## Improvements
+- Added signed int8 support \PR{3661} \PR{3508} \PR{3507} \PR{3503}
+- Increased support for half (fp16) \PR{3680} \PR{3258} \PR{3561} \PR{3627} \PR{3561} \PR{3627} \PR{3559}
+- Updated oneAPI to use Intel oneAPI (R) 2025.1 \PR{3643} \PR{3573}
+- Updated cl2hpp dependency \PR{3651} \pr{3562}
+- Add support for CUDA 12.3, 12.4, 12.5, 12.6, 12.8, and 12.9 \PR{3657} \PR{3645} \PR{3641} \PR{3636} \PR{3588} \PR{3552} \PR{3586} \PR{3541} 
+- Added minimum driver version check for CUDA GPUs \PR{3648}
+- Add more examples \PR{3530} \PR{3455} \PR{3375} \PR{3612} \PR{3584} \PR{3577}
+- Updated documentation \PR{3496} \PR{3613}
+- Improved performance of matrix multiplication of sparse matrices on the OpenCL backend \PR{3608}
+- Improved cmake configure \PR{3581} \PR{3569} \PR{3567} \PR{3564} \PR{3554}
+- Loosen indexing assertions for assignments \PR{3514}
+
+## Fixes
+- Fix jit tree when doing operations containing moddims and original array \PR{3671} 
+- Fix incorrect behavior of sub-arrays with multiple functions \PR{3679} \PR{3668} \PR{3666} \PR{3665} \PR{3664} \PR{3663} \PR{3658} \PR{3659} \PR{3650} \PR{3611} \PR{3633} \PR{3602}
+- Fix half precision operations in multiple backends \PR{3676} \PR{3662}
+- Fix for join not always respecting the order of parameters \PR{3667} \PR{3513}
+- Fix for cmake building as an external project (needed by arrayfire python wheels) \PR{3669}
+- Fix for cmake build in Windows (including with vcpkg) \PR{3655} \PR{3646} \PR{3644} \PR{3512} \PR{3626} \PR{3566} \PR{3557} \pr{3591} \PR{3592}
+- Fix race condition in OpenCL flood fill \PR{3535}
+- Fix indexing array using sequences `af_seq` that have non-unit steps \PR{3587}
+- Fix padding issue convolve2GradientNN \PR{3519}
+- Fix incorrect axis values for histogram \PR{3590}
+- Fix unified exceptions errors \PR{3617}
+- Fix OpenCL memory migration on devices with different contexts \PR{3510}
+- Fix conversion of COO Sparse to Dense matrix \PR{3589} \PR{3579}
+- Fix `AF_JIT_KERNEL_TRACE` on Windows \PR{3517}
+- Fix cmake build with CUDNN \PR{3521}
+- Fix cmake build with `AF_DISABLE_CPU_ASYNC` \PR{3551}
+
+
+## Contributions
+
+Special thanks to our contributors:
+[Willy Born](https://github.com/willyborn)
+[verstatx](https://github.com/verstatx)
+[Filip Matzner](https://github.com/FloopCZ)
+[Fraser Cormack](https://github.com/frasercrmck)
+[errata-c](https://github.com/errata-c)
+[Tyler Hilbert](https://github.com/Tyler-Hilbert)
+
+v3.9.0
+======
+
+## Improvements
+- Add oneAPI backend \PR{3296}
+- Add support to directly access arrays on other devices \PR{3447}
+- Add broadcast support \PR{2871}
+- Improve OpenCL CPU JIT performance \PR{3257} \PR{3392}
+- Optimize thread/block calculations of several kernels \PR{3144}
+- Add support for fast math compiliation when building ArrayFire \PR{3334}
+  \PR{3337}
+- Optimize performance of fftconvolve when using floats \PR{3338}
+- Add support for CUDA 12.1 and 12.2
+- Better handling of empty arrays \PR{3398}
+- Better handling of memory in linear algebra functions in OpenCL \PR{3423}
+- Better logging with JIT kernels \PR{3468}
+- Optimize memory manager/JIT interactions for small number of buffers
+  \PR{3468}
+- Documentation improvements \PR{3485}
+- Optimize reorder function \PR{3488}
+
+## Fixes
+- Improve Errors when creating OpenCL contexts from devices \PR{3257}
+- Improvements to vcpkg builds \PR{3376} \PR{3476}
+- Fix reduce by key when nan's are present \PR{3261}
+- Fix error in convolve where the ndims parameter was forced to be equal to 2
+  \PR{3277}
+- Make constructors that accept dim_t to be explicit to avoid invalid
+  conversions \PR{3259}
+- Fix error in randu when compiling against clang 14 \PR{3333}
+- Fix bug in OpenCL linear algebra functions  \PR{3398}
+- Fix bug with thread local variables when device was changed \PR{3420}
+  \PR{3421}
+- Fix bug in qr related to uninitialized memory \PR{3422}
+- Fix bug in shift where the array had an empty middle dimension \PR{3488}
+
+## Contributions
+
+Special thanks to our contributors:
+[Willy Born](https://github.com/willyborn)
+[Mike Mullen](https://github.com/mfzmullen)
+
+
+v3.8.3
+======
+
+## Improvements
+
+- Add support for CUDA 12 \PR{3352}
+- Modernize documentation style and content \PR{3351}
+- memcpy performance improvements \PR{3144}
+- JIT performance improvements \PR{3144}
+- join performance improvements \PR{3144}
+- Improve support for Intel and newer Clang compilers \PR{3334}
+- CCache support on Windows \PR{3257}
+
+## Fixes
+
+- Fix issue with some locales with OpenCL kernel generation \PR{3294}
+- Internal improvements
+- Fix leak in clfft on exit.
+- Fix some cases where ndims was incorrectly used ot calculate shape \PR{3277}
+- Fix issue when setDevice was not called in new threads \PR{3269}
+- Restrict initializer list to just fundamental types \PR{3264}
+
+## Contributions
+
+Special thanks to our contributors:
+[Carlo Cabrera](https://github.com/carlocab)
+[Guillaume Schmid](https://github.com/GuillaumeSchmid)
+[Willy Born](https://github.com/willyborn)
+[ktdq](https://github.com/ktdq)
+
+
+v3.8.2
+======
+
+## Improvements
+
+- Optimize JIT by removing some consecutive cast operations \PR{3031}
+- Add driver checks checks for CUDA 11.5 and 11.6 \PR{3203}
+- Improve the timing algorithm used for timeit \PR{3185}
+- Dynamically link against CUDA numeric libraries by default \PR{3205}
+- Add support for pruning CUDA binaries to reduce static binary sizes \PR{3234} \PR{3237}
+- Remove unused cuDNN libraries from installations \PR{3235}
+- Add support to staticly link NVRTC libraries after CUDA 11.5 \PR{3236}
+- Add support for compiling with ccache when building the CUDA backend \PR{3241}
+- Make cuSparse an optional runtime dependency \PR{3240}
+
+## Fixes
+
+- Fix issue with consecutive moddims operations in the CPU backend \PR{3232}
+- Better floating point comparisons for tests \PR{3212}
+- Fix several warnings and inconsistencies with doxygen and documentation \PR{3226}
+- Fix issue when passing empty arrays into join \PR{3211}
+- Fix default value for the `AF_COMPUTE_LIBRARY` when not set \PR{3228}
+- Fix missing symbol issue when MKL is staticly linked \PR{3244}
+- Remove linking of OpenCL's library to the unified backend \PR{3244}
+
+## Contributions
+
+Special thanks to our contributors:
+[Jacob Kahn](https://github.com/jacobkahn)
+[Willy Born](https://github.com/willyborn)
+
+
+v3.8.1
+======
+
+## Improvements
+
+- moddims now uses JIT approach for certain special cases - \PR{3177}
+- Embed Version Info in Windows DLLs - \PR{3025} 
+- OpenCL device max parameter is now queries from device properties - \PR{3032} 
+- JIT Performance Optimization: Unique funcName generation sped up - \PR{3040} 
+- Improved readability of log traces  - \PR{3050} 
+- Use short function name in non-debug build error messages - \PR{3060} 
+- SIFT/GLOH are now available as part of website binaries - \PR{3071} 
+- Short-circuit zero elements case in detail::copyArray backend function - \PR{3059} 
+- Speedup of kernel caching mechanism - \PR{3043} 
+- Add short-circuit check for empty Arrays in JIT evalNodes - \PR{3072} 
+- Performance optimization of indexing using dynamic thread block sizes - \PR{3111} 
+- ArrayFire starting with this release will use Intel MKL single dynamic library which resolves lot of linking issues unified library had when user applications used MKL themselves - \PR{3120} 
+- Add shortcut check for zero elements in af_write_array - \PR{3130} 
+- Speedup join by eliminating temp buffers for cascading joins - \PR{3145} 
+- Added batch support for solve - \PR{1705} 
+- Use pinned memory to copy device pointers in CUDA solve - \PR{1705} 
+- Added package manager instructions to docs - \PR{3076} 
+- CMake Build Improvements - \PR{3027} , \PR{3089} , \PR{3037} , \PR{3072} , \PR{3095} , \PR{3096} , \PR{3097} , \PR{3102} , \PR{3106} , \PR{3105} , \PR{3120} , \PR{3136} , \PR{3135} , \PR{3137} , \PR{3119} , \PR{3150} , \PR{3138} , \PR{3156} , \PR{3139} , \PR{1705} , \PR{3162} 
+- CPU backend improvements - \PR{3010} , \PR{3138} , \PR{3161} 
+- CUDA backend improvements - \PR{3066} , \PR{3091} , \PR{3093} , \PR{3125} , \PR{3143} , \PR{3161} 
+- OpenCL backend improvements - \PR{3091} , \PR{3068} , \PR{3127} , \PR{3010} , \PR{3039} , \PR{3138} , \PR{3161} 
+- General(including JIT) performance improvements across backends - \PR{3167} 
+- Testing improvements - \PR{3072} , \PR{3131} , \PR{3151} , \PR{3141} , \PR{3153} , \PR{3152} , \PR{3157} , \PR{1705} , \PR{3170} , \PR{3167} 
+- Update CLBlast to latest version - \PR{3135} , \PR{3179} 
+- Improved Otsu threshold computation helper in canny algorithm - \PR{3169} 
+- Modified default parameters for fftR2C and fftC2R C++ API from 0 to 1.0 - \PR{3178} 
+- Use appropriate MKL getrs_batch_strided API based on MKL Versions - \PR{3181} 
+
+## Fixes
+
+- Fixed a bug JIT kernel disk caching - \PR{3182} 
+- Fixed stream used by thrust(CUDA backend) functions - \PR{3029}  
+- Added workaround for new cuSparse API that was added by CUDA amid fix releases - \PR{3057} 
+- Fixed `const` array indexing inside `gfor` - \PR{3078} 
+- Handle zero elements in copyData to host - \PR{3059} 
+- Fixed double free regression in OpenCL backend - \PR{3091} 
+- Fixed an infinite recursion bug in NaryNode JIT Node - \PR{3072} 
+- Added missing input validation check in sparse-dense arithmetic operations - \PR{3129} 
+- Fixed bug in `getMappedPtr` in OpenCL due to invalid lambda capture - \PR{3163} 
+- Fixed bug in `getMappedPtr` on Arrays that are not ready - \PR{3163} 
+- Fixed edgeTraceKernel for CPU devices on OpenCL backend - \PR{3164} 
+- Fixed windows build issue(s) with VS2019 - \PR{3048}
+- API documentation fixes - \PR{3075} , \PR{3076} , \PR{3143} , \PR{3161} 
+- CMake Build Fixes - \PR{3088} 
+- Fixed the tutorial link in README - \PR{3033} 
+- Fixed function name typo in timing tutorial - \PR{3028} 
+- Fixed couple of bugs in CPU backend canny implementation - \PR{3169} 
+- Fixed reference count of array(s) used in JIT operations. It is related to arrayfire's internal memory book keeping. The behavior/accuracy of arrayfire code wasn't broken earlier. It corrected the reference count to be of optimal value in the said scenarios. This may potentially reduce memory usage in some narrow cases - \PR{3167} 
+- Added assert that checks if topk is called with a negative value for k - \PR{3176} 
+- Fixed an Issue where countByKey would give incorrect results for any n > 128 - \PR{3175} 
+
+## Contributions
+
+Special thanks to our contributors:
+[HO-COOH][https://github.com/HO-COOH]
+[Willy Born][https://github.com/willyborn]
+[Gilad Avidov][https://github.com/avidov]
+[Pavan Yalamanchili][https://github.com/pavanky]
+
 v3.8.0
 ======
 
@@ -1122,7 +1337,7 @@ Bug Fixes
       before returning pointer with asynchronous calls in CPU backend.
     * OpenCL Backend: [fix segfaults](https://github.com/arrayfire/arrayfire/issues/1324)
       when requested for device pointers on empty arrays.
-* Fixed \ref af::array::operator%() from using [rem to mod](https://github.com/arrayfire/arrayfire/issues/1318).
+* Fixed \ref af::operator%() from using [rem to mod](https://github.com/arrayfire/arrayfire/issues/1318).
 * Fixed [array destruction](https://github.com/arrayfire/arrayfire/issues/1321)
   when backends are switched in Unified API.
 * Fixed [indexing](https://github.com/arrayfire/arrayfire/issues/1331) after
@@ -1261,9 +1476,9 @@ Deprecations
 Documentation
 --------------
 
-* Fixes to documentation for \ref matchTemplate().
+* Fixes to documentation for \ref af::matchTemplate().
 * Improved documentation for deviceInfo.
-* Fixes to documentation for \ref exp().
+* Fixes to documentation for \ref af::exp().
 
 Known Issues
 ------------
@@ -1402,18 +1617,18 @@ Major Updates
 Function Additions
 ------------------
 * Unified Backend
-    * \ref setBackend() - Sets a backend as active
-    * \ref getBackendCount() - Gets the number of backends available for use
-    * \ref getAvailableBackends() - Returns information about available backends
-    * \ref getBackendId() - Gets the backend enum for an array
+    * \ref af::setBackend() - Sets a backend as active
+    * \ref af::getBackendCount() - Gets the number of backends available for use
+    * \ref af::getAvailableBackends() - Returns information about available backends
+    * \ref af::getBackendId() - Gets the backend enum for an array
 
 * Vision
-    * \ref homography() - Homography estimation
-    * \ref gloh() - GLOH Descriptor for SIFT
+    * \ref af::homography() - Homography estimation
+    * \ref af::gloh() - GLOH Descriptor for SIFT
 
 * Image Processing
-    * \ref loadImageNative() - Load an image as native data without modification
-    * \ref saveImageNative() - Save an image without modifying data or type
+    * \ref af::loadImageNative() - Load an image as native data without modification
+    * \ref af::saveImageNative() - Save an image without modifying data or type
 
 * Graphics
     * \ref af::Window::plot3() - 3-dimensional line plot
@@ -1427,26 +1642,26 @@ Function Additions
     * \ref af_release_indexers()
 
 * CUDA Backend Specific
-    * \ref setNativeId() - Set the CUDA device with given native id as active
+    * \ref afcu::setNativeId() - Set the CUDA device with given native id as active
         * ArrayFire uses a modified order for devices. The native id for a
           device can be retreived using `nvidia-smi`
 
 * OpenCL Backend Specific
-    * \ref setDeviceId() - Set the OpenCL device using the `clDeviceId`
+    * \ref afcl::setDeviceId() - Set the OpenCL device using the `clDeviceId`
 
 Other Improvements
 ------------------------
-* Added \ref c32 and \ref c64 support for \ref isNaN(), \ref isInf() and \ref iszero()
-* Added CPU information for `x86` and `x86_64` architectures in CPU backend's \ref info()
-* Batch support for \ref approx1() and \ref approx2()
+* Added \ref c32 and \ref c64 support for \ref af::isNaN(), \ref af::isInf() and \ref af::iszero()
+* Added CPU information for `x86` and `x86_64` architectures in CPU backend's \ref af::info()
+* Batch support for \ref af::approx1() and \ref af::approx2()
     * Now can be used with gfor as well
 * Added \ref s64 and \ref u64 support to:
-    * \ref sort() (along with sort index and sort by key)
-    * \ref setUnique(), \ref setUnion(), \ref setIntersect()
-    * \ref convolve() and \ref fftConvolve()
-    * \ref histogram() and \ref histEqual()
-    * \ref lookup()
-    * \ref mean()
+    * \ref af::sort() (along with sort index and sort by key)
+    * \ref af::setUnique(), \ref af::setUnion(), \ref af::setIntersect()
+    * \ref af::convolve() and \ref af::fftConvolve()
+    * \ref af::histogram() and \ref af::histEqual()
+    * \ref af::lookup()
+    * \ref af::mean()
 * Added \ref AF_MSG macro
 
 Build Improvements
@@ -1458,15 +1673,15 @@ Build Improvements
 
 Bug Fixes
 --------------
-* Fixed [memory leak](https://github.com/arrayfire/arrayfire/pull/1096) in \ref susan()
+* Fixed [memory leak](https://github.com/arrayfire/arrayfire/pull/1096) in \ref af::susan()
 * Fixed [failing test](https://github.com/arrayfire/arrayfire/commit/144a2db)
-  in \ref lower() and \ref upper() for CUDA compute 53
+  in \ref af::lower() and \ref af::upper() for CUDA compute 53
 * Fixed [bug](https://github.com/arrayfire/arrayfire/issues/1092) in CUDA for indexing out of bounds
-* Fixed [dims check](https://github.com/arrayfire/arrayfire/commit/6975da8) in \ref iota()
-* Fixed [out-of-bounds access](https://github.com/arrayfire/arrayfire/commit/7fc3856) in \ref sift()
-* Fixed [memory allocation](https://github.com/arrayfire/arrayfire/commit/5e88e4a) in \ref fast() OpenCL
+* Fixed [dims check](https://github.com/arrayfire/arrayfire/commit/6975da8) in \ref af::iota()
+* Fixed [out-of-bounds access](https://github.com/arrayfire/arrayfire/commit/7fc3856) in \ref af::sift()
+* Fixed [memory allocation](https://github.com/arrayfire/arrayfire/commit/5e88e4a) in \ref af::fast() OpenCL
 * Fixed [memory leak](https://github.com/arrayfire/arrayfire/pull/994) in image I/O functions
-* \ref dog() now returns float-point type arrays
+* \ref af::dog() now returns float-point type arrays
 
 Documentation Updates
 ---------------------
@@ -1569,10 +1784,10 @@ v3.1.0
 Function Additions
 ------------------
 * Computer Vision Functions
-    * \ref nearestNeighbour() - Nearest Neighbour with SAD, SSD and SHD distances
-    * \ref harris() - Harris Corner Detector
-    * \ref susan() - Susan Corner Detector
-    * \ref sift() - Scale Invariant Feature Transform (SIFT)
+    * \ref af::nearestNeighbour() - Nearest Neighbour with SAD, SSD and SHD distances
+    * \ref af::harris() - Harris Corner Detector
+    * \ref af::susan() - Susan Corner Detector
+    * \ref af::sift() - Scale Invariant Feature Transform (SIFT)
         * Method and apparatus for identifying scale invariant features"
           "in an image and use of same for locating an object in an image,\" David"
           "G. Lowe, US Patent 6,711,293 (March 23, 2004). Provisional application"
@@ -1582,7 +1797,7 @@ Function Additions
           "Columbia.")
         * SIFT is available for compiling but does not ship with ArrayFire
           hosted installers/pre-built libraries
-    * \ref dog() -  Difference of Gaussians
+    * \ref af::dog() -  Difference of Gaussians
 
 * Image Processing Functions
     * \ref ycbcr2rgb() and \ref rgb2ycbcr() - RGB <->YCbCr color space conversion
@@ -1708,20 +1923,20 @@ Bug Fixes
 --------------
 
 * Added missing symbols from the compatible API
-* Fixed a bug affecting corner rows and elements in \ref grad()
+* Fixed a bug affecting corner rows and elements in \ref af::grad()
 * Fixed linear interpolation bugs affecting large images in the following:
-    - \ref approx1()
-    - \ref approx2()
-    - \ref resize()
-    - \ref rotate()
-    - \ref scale()
-    - \ref skew()
-    - \ref transform()
+    - \ref af::approx1()
+    - \ref af::approx2()
+    - \ref af::resize()
+    - \ref af::rotate()
+    - \ref af::scale()
+    - \ref af::skew()
+    - \ref af::transform()
 
 Documentation
 -----------------
 
-* Added missing documentation for \ref constant()
+* Added missing documentation for \ref af::constant()
 * Added missing documentation for `array::scalar()`
 * Added supported input types for functions in `arith.h`
 

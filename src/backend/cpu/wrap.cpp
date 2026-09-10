@@ -15,8 +15,9 @@
 #include <platform.hpp>
 #include <wrap.hpp>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
@@ -48,6 +49,7 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(short)
@@ -84,3 +86,4 @@ INSTANTIATE(half)
 #undef INSTANTIATE
 
 }  // namespace cpu
+}  // namespace arrayfire

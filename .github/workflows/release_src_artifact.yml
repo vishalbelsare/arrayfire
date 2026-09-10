@@ -9,7 +9,7 @@ name: ci
 jobs:
     upload_src_tarball:
         name: Upload release source tarball
-        runs-on: ubuntu-18.04
+        runs-on: ubuntu-latest
         steps:
             - name: Fetch Repo Info
               run: |
@@ -40,13 +40,13 @@ jobs:
                                           libopenblas-dev \
                                           ocl-icd-opencl-dev \
                                           nvidia-cuda-toolkit \
-                                          libboost1.68-dev
+                                          libboost-dev
 
             - name: CMake Configure
               run: |
                   cd ${GITHUB_WORKSPACE}/arrayfire-full-${AF_VER}
                   mkdir build && cd build
-                  cmake .. -DAF_BUILD_FORGE:BOOL=ON
+                  cmake .. -DAF_BUILD_FORGE:BOOL=ON -DAF_COMPUTE_LIBRARY="FFTW/LAPACK/BLAS"
 
             - name: Create source tarball
               id: create-src-tarball

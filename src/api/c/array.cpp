@@ -17,57 +17,24 @@
 #include <af/sparse.h>
 
 using af::dim4;
-using common::half;
-using common::SparseArrayBase;
+using arrayfire::copyData;
+using arrayfire::copySparseArray;
+using arrayfire::getSparseArrayBase;
+using arrayfire::getUseCount;
+using arrayfire::releaseHandle;
+using arrayfire::releaseSparseHandle;
+using arrayfire::retainSparseHandle;
+using arrayfire::common::half;
+using arrayfire::common::SparseArrayBase;
 using detail::cdouble;
 using detail::cfloat;
+using detail::createDeviceDataArray;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
 using detail::ushort;
-
-af_array createHandle(const dim4 &d, af_dtype dtype) {
-    // clang-format off
-    switch (dtype) {
-        case f32: return createHandle<float  >(d);
-        case c32: return createHandle<cfloat >(d);
-        case f64: return createHandle<double >(d);
-        case c64: return createHandle<cdouble>(d);
-        case b8:  return createHandle<char   >(d);
-        case s32: return createHandle<int    >(d);
-        case u32: return createHandle<uint   >(d);
-        case u8:  return createHandle<uchar  >(d);
-        case s64: return createHandle<intl   >(d);
-        case u64: return createHandle<uintl  >(d);
-        case s16: return createHandle<short  >(d);
-        case u16: return createHandle<ushort >(d);
-        case f16: return createHandle<half   >(d);
-        default: TYPE_ERROR(3, dtype);
-    }
-    // clang-format on
-}
-
-af_array createHandleFromValue(const dim4 &d, double val, af_dtype dtype) {
-    // clang-format off
-    switch (dtype) {
-        case f32: return createHandleFromValue<float  >(d, val);
-        case c32: return createHandleFromValue<cfloat >(d, val);
-        case f64: return createHandleFromValue<double >(d, val);
-        case c64: return createHandleFromValue<cdouble>(d, val);
-        case b8:  return createHandleFromValue<char   >(d, val);
-        case s32: return createHandleFromValue<int    >(d, val);
-        case u32: return createHandleFromValue<uint   >(d, val);
-        case u8:  return createHandleFromValue<uchar  >(d, val);
-        case s64: return createHandleFromValue<intl   >(d, val);
-        case u64: return createHandleFromValue<uintl  >(d, val);
-        case s16: return createHandleFromValue<short  >(d, val);
-        case u16: return createHandleFromValue<ushort >(d, val);
-        case f16: return createHandleFromValue<half   >(d, val);
-        default: TYPE_ERROR(3, dtype);
-    }
-    // clang-format on
-}
 
 af_err af_get_data_ptr(void *data, const af_array arr) {
     try {
@@ -81,6 +48,7 @@ af_err af_get_data_ptr(void *data, const af_array arr) {
             case b8:  copyData(static_cast<char*    >(data), arr); break;
             case s32: copyData(static_cast<int*     >(data), arr); break;
             case u32: copyData(static_cast<unsigned*>(data), arr); break;
+            case s8:  copyData(static_cast<schar*   >(data), arr); break;
             case u8:  copyData(static_cast<uchar*   >(data), arr); break;
             case s64: copyData(static_cast<intl*    >(data), arr); break;
             case u64: copyData(static_cast<uintl*   >(data), arr); break;
@@ -129,6 +97,9 @@ af_err af_create_array(af_array *result, const void *const data,
                 break;
             case u32:
                 out = createHandleFromData(d, static_cast<const uint *>(data));
+                break;
+            case s8:
+                out = createHandleFromData(d, static_cast<const schar *>(data));
                 break;
             case u8:
                 out = createHandleFromData(d, static_cast<const uchar *>(data));
@@ -209,6 +180,7 @@ af_err af_copy_array(af_array *out, const af_array in) {
                 case b8: res = copyArray<char>(in); break;
                 case s32: res = copyArray<int>(in); break;
                 case u32: res = copyArray<uint>(in); break;
+                case s8: res = copyArray<schar>(in); break;
                 case u8: res = copyArray<uchar>(in); break;
                 case s64: res = copyArray<intl>(in); break;
                 case u64: res = copyArray<uintl>(in); break;
@@ -227,24 +199,25 @@ af_err af_copy_array(af_array *out, const af_array in) {
 // Strong Exception Guarantee
 af_err af_get_data_ref_count(int *use_count, const af_array in) {
     try {
-        const ArrayInfo &info = getInfo(in, false, false);
+        const ArrayInfo &info = getInfo(in, false);
         const af_dtype type   = info.getType();
 
         int res;
         switch (type) {
-            case f32: res = getArray<float>(in).useCount(); break;
-            case c32: res = getArray<cfloat>(in).useCount(); break;
-            case f64: res = getArray<double>(in).useCount(); break;
-            case c64: res = getArray<cdouble>(in).useCount(); break;
-            case b8: res = getArray<char>(in).useCount(); break;
-            case s32: res = getArray<int>(in).useCount(); break;
-            case u32: res = getArray<uint>(in).useCount(); break;
-            case u8: res = getArray<uchar>(in).useCount(); break;
-            case s64: res = getArray<intl>(in).useCount(); break;
-            case u64: res = getArray<uintl>(in).useCount(); break;
-            case s16: res = getArray<short>(in).useCount(); break;
-            case u16: res = getArray<ushort>(in).useCount(); break;
-            case f16: res = getArray<half>(in).useCount(); break;
+            case f32: res = getUseCount<float>(in); break;
+            case c32: res = getUseCount<cfloat>(in); break;
+            case f64: res = getUseCount<double>(in); break;
+            case c64: res = getUseCount<cdouble>(in); break;
+            case b8: res = getUseCount<char>(in); break;
+            case s32: res = getUseCount<int>(in); break;
+            case u32: res = getUseCount<uint>(in); break;
+            case s8: res = getUseCount<schar>(in); break;
+            case u8: res = getUseCount<uchar>(in); break;
+            case s64: res = getUseCount<intl>(in); break;
+            case u64: res = getUseCount<uintl>(in); break;
+            case s16: res = getUseCount<short>(in); break;
+            case u16: res = getUseCount<ushort>(in); break;
+            case f16: res = getUseCount<half>(in); break;
             default: TYPE_ERROR(1, type);
         }
         std::swap(*use_count, res);
@@ -256,7 +229,7 @@ af_err af_get_data_ref_count(int *use_count, const af_array in) {
 af_err af_release_array(af_array arr) {
     try {
         if (arr == 0) { return AF_SUCCESS; }
-        const ArrayInfo &info = getInfo(arr, false, false);
+        const ArrayInfo &info = getInfo(arr, false);
         af_dtype type         = info.getType();
 
         if (info.isSparse()) {
@@ -276,6 +249,7 @@ af_err af_release_array(af_array arr) {
                 case b8: releaseHandle<char>(arr); break;
                 case s32: releaseHandle<int>(arr); break;
                 case u32: releaseHandle<uint>(arr); break;
+                case s8: releaseHandle<schar>(arr); break;
                 case u8: releaseHandle<uchar>(arr); break;
                 case s64: releaseHandle<intl>(arr); break;
                 case u64: releaseHandle<uintl>(arr); break;
@@ -289,38 +263,6 @@ af_err af_release_array(af_array arr) {
     CATCHALL
 
     return AF_SUCCESS;
-}
-
-af_array retain(const af_array in) {
-    const ArrayInfo &info = getInfo(in, false, false);
-    af_dtype ty           = info.getType();
-
-    if (info.isSparse()) {
-        switch (ty) {
-            case f32: return retainSparseHandle<float>(in);
-            case f64: return retainSparseHandle<double>(in);
-            case c32: return retainSparseHandle<detail::cfloat>(in);
-            case c64: return retainSparseHandle<detail::cdouble>(in);
-            default: TYPE_ERROR(1, ty);
-        }
-    } else {
-        switch (ty) {
-            case f32: return retainHandle<float>(in);
-            case f64: return retainHandle<double>(in);
-            case s32: return retainHandle<int>(in);
-            case u32: return retainHandle<uint>(in);
-            case u8: return retainHandle<uchar>(in);
-            case c32: return retainHandle<detail::cfloat>(in);
-            case c64: return retainHandle<detail::cdouble>(in);
-            case b8: return retainHandle<char>(in);
-            case s64: return retainHandle<intl>(in);
-            case u64: return retainHandle<uintl>(in);
-            case s16: return retainHandle<short>(in);
-            case u16: return retainHandle<ushort>(in);
-            case f16: return retainHandle<half>(in);
-            default: TYPE_ERROR(1, ty);
-        }
-    }
 }
 
 af_err af_retain_array(af_array *out, const af_array in) {
@@ -374,6 +316,9 @@ af_err af_write_array(af_array arr, const void *data, const size_t bytes,
             case u32:
                 write_array(arr, static_cast<const uint *>(data), bytes, src);
                 break;
+            case s8:
+                write_array(arr, static_cast<const schar *>(data), bytes, src);
+                break;
             case u8:
                 write_array(arr, static_cast<const uchar *>(data), bytes, src);
                 break;
@@ -402,7 +347,7 @@ af_err af_write_array(af_array arr, const void *data, const size_t bytes,
 af_err af_get_elements(dim_t *elems, const af_array arr) {
     try {
         // Do not check for device mismatch
-        *elems = getInfo(arr, false, false).elements();
+        *elems = getInfo(arr, false).elements();
     }
     CATCHALL
     return AF_SUCCESS;
@@ -411,7 +356,7 @@ af_err af_get_elements(dim_t *elems, const af_array arr) {
 af_err af_get_type(af_dtype *type, const af_array arr) {
     try {
         // Do not check for device mismatch
-        *type = getInfo(arr, false, false).getType();
+        *type = getInfo(arr, false).getType();
     }
     CATCHALL
     return AF_SUCCESS;
@@ -421,7 +366,7 @@ af_err af_get_dims(dim_t *d0, dim_t *d1, dim_t *d2, dim_t *d3,
                    const af_array in) {
     try {
         // Do not check for device mismatch
-        const ArrayInfo &info = getInfo(in, false, false);
+        const ArrayInfo &info = getInfo(in, false);
         *d0                   = info.dims()[0];
         *d1                   = info.dims()[1];
         *d2                   = info.dims()[2];
@@ -434,7 +379,7 @@ af_err af_get_dims(dim_t *d0, dim_t *d1, dim_t *d2, dim_t *d3,
 af_err af_get_numdims(unsigned *nd, const af_array in) {
     try {
         // Do not check for device mismatch
-        const ArrayInfo &info = getInfo(in, false, false);
+        const ArrayInfo &info = getInfo(in, false);
         *nd                   = info.ndims();
     }
     CATCHALL
@@ -442,14 +387,14 @@ af_err af_get_numdims(unsigned *nd, const af_array in) {
 }
 
 #undef INSTANTIATE
-#define INSTANTIATE(fn1, fn2)                                  \
-    af_err fn1(bool *result, const af_array in) {              \
-        try {                                                  \
-            const ArrayInfo &info = getInfo(in, false, false); \
-            *result               = info.fn2();                \
-        }                                                      \
-        CATCHALL                                               \
-        return AF_SUCCESS;                                     \
+#define INSTANTIATE(fn1, fn2)                           \
+    af_err fn1(bool *result, const af_array in) {       \
+        try {                                           \
+            const ArrayInfo &info = getInfo(in, false); \
+            *result               = info.fn2();         \
+        }                                               \
+        CATCHALL                                        \
+        return AF_SUCCESS;                              \
     }
 
 INSTANTIATE(af_is_empty, isEmpty)
@@ -498,6 +443,9 @@ af_err af_get_scalar(void *output_value, const af_array arr) {
                 break;
             case u32:
                 getScalar<uint>(reinterpret_cast<uint *>(output_value), arr);
+                break;
+            case s8:
+                getScalar<schar>(reinterpret_cast<schar *>(output_value), arr);
                 break;
             case u8:
                 getScalar<uchar>(reinterpret_cast<uchar *>(output_value), arr);

@@ -26,9 +26,9 @@ template<typename T>
 class Var : public ::testing::Test {};
 
 typedef ::testing::Types<float, double, cfloat, cdouble, uint, int, uintl, intl,
-                         char, uchar, short, ushort, half_float::half>
+                         char, schar, uchar, short, ushort, half_float::half>
     TestTypes;
-TYPED_TEST_CASE(Var, TestTypes);
+TYPED_TEST_SUITE(Var, TestTypes);
 
 template<typename T>
 struct elseType {
@@ -42,8 +42,8 @@ struct varOutType {
     typedef typename cond_type<
         is_same_type<T, float>::value || is_same_type<T, int>::value ||
             is_same_type<T, uint>::value || is_same_type<T, short>::value ||
-            is_same_type<T, ushort>::value || is_same_type<T, uchar>::value ||
-            is_same_type<T, char>::value,
+            is_same_type<T, ushort>::value || is_same_type<T, schar>::value ||
+            is_same_type<T, uchar>::value || is_same_type<T, char>::value,
         float, typename elseType<T>::type>::type type;
 };
 
@@ -126,8 +126,8 @@ void dimCppSmallTest(const string pFileName,
     SUPPORTED_TYPE_CHECK(outType);
 
     vector<dim4> numDims;
-    vector<vector<T> > in;
-    vector<vector<outType> > tests;
+    vector<vector<T>> in;
+    vector<vector<outType>> tests;
 
     readTests<T, outType, float>(pFileName, numDims, in, tests);
 
@@ -148,7 +148,7 @@ void dimCppSmallTest(const string pFileName,
                               : var(input, AF_VARIANCE_POPULATION, 1));
 #pragma GCC diagnostic pop
 
-        vector<vector<outType> > h_out(4);
+        vector<vector<outType>> h_out(4);
 
         h_out[0].resize(bout.elements());
         h_out[1].resize(nbout.elements());

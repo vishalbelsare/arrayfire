@@ -8,6 +8,7 @@
  ********************************************************/
 #include <kernel/convolve.hpp>
 
+namespace arrayfire {
 namespace cuda {
 namespace kernel {
 
@@ -21,6 +22,7 @@ INSTANTIATE(float, float)
 INSTANTIATE(uint, float)
 INSTANTIATE(int, float)
 INSTANTIATE(uchar, float)
+INSTANTIATE(schar, float)
 INSTANTIATE(char, float)
 INSTANTIATE(ushort, float)
 INSTANTIATE(short, float)
@@ -29,3 +31,4 @@ INSTANTIATE(intl, float)
 
 }  // namespace kernel
 }  // namespace cuda
+}  // namespace arrayfire

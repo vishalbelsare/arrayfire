@@ -15,8 +15,9 @@
 #include <math.hpp>
 #include <stdexcept>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cuda {
 template<typename T>
 Array<T> iota(const dim4 &dims, const dim4 &tile_dims) {
@@ -37,8 +38,10 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(half)
 }  // namespace cuda
+}  // namespace arrayfire

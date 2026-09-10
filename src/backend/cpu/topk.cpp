@@ -18,12 +18,13 @@
 #include <numeric>
 #include <vector>
 
-using common::half;
+using arrayfire::common::half;
 using std::iota;
 using std::min;
 using std::partial_sort_copy;
 using std::vector;
 
+namespace arrayfire {
 namespace cpu {
 template<typename T>
 void topk(Array<T>& vals, Array<unsigned>& idxs, const Array<T>& in,
@@ -57,19 +58,49 @@ void topk(Array<T>& vals, Array<unsigned>& idxs, const Array<T>& in,
             auto idx_itr = begin(idx) + i * in.strides()[1];
             auto* kiptr  = iptr + k * i;
 
-            if (order == AF_TOPK_MIN) {
-                // Sort the top k values in each column
-                partial_sort_copy(
-                    idx_itr, idx_itr + in.strides()[1], kiptr, kiptr + k,
-                    [ptr](const uint lhs, const uint rhs) -> bool {
-                        return compute_t<T>(ptr[lhs]) < compute_t<T>(ptr[rhs]);
-                    });
+            if (order & AF_TOPK_MIN) {
+                if (order & AF_TOPK_STABLE) {
+                    partial_sort_copy(
+                        idx_itr, idx_itr + in.strides()[1], kiptr, kiptr + k,
+                        [ptr](const uint lhs, const uint rhs) -> bool {
+                            return compute_t<T>(ptr[lhs]) <
+                                           compute_t<T>(ptr[rhs])
+                                       ? true
+                                   : compute_t<T>(ptr[lhs]) ==
+                                           compute_t<T>(ptr[rhs])
+                                       ? (lhs < rhs)
+                                       : false;
+                        });
+                } else {
+                    partial_sort_copy(
+                        idx_itr, idx_itr + in.strides()[1], kiptr, kiptr + k,
+                        [ptr](const uint lhs, const uint rhs) -> bool {
+                            return compute_t<T>(ptr[lhs]) <
+                                   compute_t<T>(ptr[rhs]);
+                        });
+                    // Sort the top k values in each column
+                }
             } else {
-                partial_sort_copy(
-                    idx_itr, idx_itr + in.strides()[1], kiptr, kiptr + k,
-                    [ptr](const uint lhs, const uint rhs) -> bool {
-                        return compute_t<T>(ptr[lhs]) >= compute_t<T>(ptr[rhs]);
-                    });
+                if (order & AF_TOPK_STABLE) {
+                    partial_sort_copy(
+                        idx_itr, idx_itr + in.strides()[1], kiptr, kiptr + k,
+                        [ptr](const uint lhs, const uint rhs) -> bool {
+                            return compute_t<T>(ptr[lhs]) >
+                                           compute_t<T>(ptr[rhs])
+                                       ? true
+                                   : compute_t<T>(ptr[lhs]) ==
+                                           compute_t<T>(ptr[rhs])
+                                       ? (lhs < rhs)
+                                       : false;
+                        });
+                } else {
+                    partial_sort_copy(
+                        idx_itr, idx_itr + in.strides()[1], kiptr, kiptr + k,
+                        [ptr](const uint lhs, const uint rhs) -> bool {
+                            return compute_t<T>(ptr[lhs]) >
+                                   compute_t<T>(ptr[rhs]);
+                        });
+                }
             }
 
             auto* kvptr = vptr + k * i;
@@ -100,3 +131,4 @@ INSTANTIATE(long long)
 INSTANTIATE(unsigned long long)
 INSTANTIATE(half)
 }  // namespace cpu
+}  // namespace arrayfire

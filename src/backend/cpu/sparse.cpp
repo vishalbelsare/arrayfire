@@ -28,19 +28,20 @@
 
 #include <functional>
 
-using common::cast;
+using arrayfire::common::cast;
 using std::function;
 
+namespace arrayfire {
 namespace cpu {
 
-using common::createArrayDataSparseArray;
-using common::createEmptySparseArray;
-using common::SparseArray;
+using arrayfire::common::createArrayDataSparseArray;
+using arrayfire::common::createEmptySparseArray;
+using arrayfire::common::SparseArray;
 
 template<typename T, af_storage stype>
 SparseArray<T> sparseConvertDenseToStorage(const Array<T> &in) {
     if (stype == AF_STORAGE_CSR) {
-        uint nNZ = reduce_all<af_notzero_t, T, uint>(in);
+        uint nNZ = getScalar<uint>(reduce_all<af_notzero_t, T, uint>(in));
 
         auto sparse = createEmptySparseArray<T>(in.dims(), nNZ, stype);
         sparse.eval();
@@ -161,3 +162,4 @@ INSTANTIATE_SPARSE(cdouble)
 #undef INSTANTIATE_SPARSE
 
 }  // namespace cpu
+}  // namespace arrayfire

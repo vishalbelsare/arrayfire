@@ -9,10 +9,12 @@
 
 #include <Array.hpp>
 
+namespace arrayfire {
 namespace cuda {
 template<typename T>
 Array<T> join(const int dim, const Array<T> &first, const Array<T> &second);
 
 template<typename T>
-Array<T> join(const int dim, const std::vector<Array<T>> &inputs);
+void join(Array<T> &out, const int dim, const std::vector<Array<T>> &inputs);
 }  // namespace cuda
+}  // namespace arrayfire

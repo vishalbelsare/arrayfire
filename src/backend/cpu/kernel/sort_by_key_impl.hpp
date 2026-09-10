@@ -20,6 +20,7 @@
 #include <tuple>
 #include <utility>
 
+namespace arrayfire {
 namespace cpu {
 namespace kernel {
 
@@ -168,8 +169,11 @@ void sort0ByKey(Param<Tk> okey, Param<Tv> oval, bool isAscending) {
     INSTANTIATE(Tk, short)   \
     INSTANTIATE(Tk, ushort)  \
     INSTANTIATE(Tk, char)    \
+    INSTANTIATE(Tk, schar)   \
     INSTANTIATE(Tk, uchar)   \
     INSTANTIATE(Tk, intl)    \
     INSTANTIATE(Tk, uintl)
+
 }  // namespace kernel
 }  // namespace cpu
+}  // namespace arrayfire

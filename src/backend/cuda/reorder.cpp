@@ -16,8 +16,9 @@
 
 #include <stdexcept>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cuda {
 
 template<typename T>
@@ -42,6 +43,7 @@ INSTANTIATE(cfloat)
 INSTANTIATE(cdouble)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(intl)
@@ -51,3 +53,4 @@ INSTANTIATE(ushort)
 INSTANTIATE(half)
 
 }  // namespace cuda
+}  // namespace arrayfire

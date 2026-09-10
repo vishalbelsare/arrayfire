@@ -39,11 +39,12 @@ class RotateLinear : public ::testing::Test {
 };
 
 // create a list of types to be tested
-typedef ::testing::Types<float, double, cfloat, cdouble, int, intl, char, short>
+typedef ::testing::Types<float, double, cfloat, cdouble, int, intl, schar, char,
+                         short>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(RotateLinear, TestTypes);
+TYPED_TEST_SUITE(RotateLinear, TestTypes);
 
 #define PI 3.1415926535897931f
 
@@ -53,9 +54,13 @@ void rotateTest(string pTestFile, const unsigned resultIdx, const float angle,
                 const vector<af_seq>* seqv = NULL) {
     SUPPORTED_TYPE_CHECK(T);
 
+    if (is_same_type<T, schar>::value && (int)angle % 90 != 0) {
+        GTEST_SKIP() << "Incompatible test data for s8";
+    }
+
     vector<dim4> numDims;
-    vector<vector<T> > in;
-    vector<vector<T> > tests;
+    vector<vector<T>> in;
+    vector<vector<T>> tests;
     readTests<T, T, float>(pTestFile, numDims, in, tests);
 
     dim4 dims = numDims[0];
@@ -182,8 +187,8 @@ TEST(RotateLinear, CPP) {
     const bool crop          = false;
 
     vector<dim4> numDims;
-    vector<vector<float> > in;
-    vector<vector<float> > tests;
+    vector<vector<float>> in;
+    vector<vector<float>> tests;
     readTests<float, float, float>(
         string(TEST_DIR "/rotate/rotatelinear1.test"), numDims, in, tests);
 

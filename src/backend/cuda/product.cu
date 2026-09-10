@@ -7,11 +7,12 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#include "reduce_impl.hpp"
 #include <common/half.hpp>
+#include "reduce_impl.hpp"
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cuda {
 // mul
 INSTANTIATE(af_mul_t, float, float)
@@ -23,8 +24,10 @@ INSTANTIATE(af_mul_t, uint, uint)
 INSTANTIATE(af_mul_t, intl, intl)
 INSTANTIATE(af_mul_t, uintl, uintl)
 INSTANTIATE(af_mul_t, char, int)
+INSTANTIATE(af_mul_t, schar, int)
 INSTANTIATE(af_mul_t, uchar, uint)
 INSTANTIATE(af_mul_t, short, int)
 INSTANTIATE(af_mul_t, ushort, uint)
 INSTANTIATE(af_mul_t, half, float)
 }  // namespace cuda
+}  // namespace arrayfire

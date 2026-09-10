@@ -34,11 +34,12 @@ class Rotate : public ::testing::Test {
 };
 
 // create a list of types to be tested
-typedef ::testing::Types<float, double, cfloat, cdouble, int, intl, char, short>
+typedef ::testing::Types<float, double, cfloat, cdouble, int, intl, char, schar,
+                         short>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Rotate, TestTypes);
+TYPED_TEST_SUITE(Rotate, TestTypes);
 
 #define PI 3.1415926535897931f
 
@@ -48,8 +49,8 @@ void rotateTest(string pTestFile, const unsigned resultIdx, const float angle,
     SUPPORTED_TYPE_CHECK(T);
 
     vector<dim4> numDims;
-    vector<vector<T> > in;
-    vector<vector<T> > tests;
+    vector<vector<T>> in;
+    vector<vector<T>> tests;
     readTests<T, T, float>(pTestFile, numDims, in, tests);
 
     dim4 dims = numDims[0];
@@ -164,8 +165,8 @@ TEST(Rotate, CPP) {
     const bool crop          = false;
 
     vector<dim4> numDims;
-    vector<vector<float> > in;
-    vector<vector<float> > tests;
+    vector<vector<float>> in;
+    vector<vector<float>> tests;
     readTests<float, float, float>(string(TEST_DIR "/rotate/rotate1.test"),
                                    numDims, in, tests);
 

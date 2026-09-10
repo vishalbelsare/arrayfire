@@ -27,6 +27,7 @@
 using af::dim4;
 using std::swap;
 
+namespace arrayfire {
 namespace cuda {
 template<af_op_t op, typename Ti, typename To>
 Array<To> reduce(const Array<Ti> &in, const int dim, bool change_nan,
@@ -171,8 +172,8 @@ void reduce_by_key_dim(Array<Tk> &keys_out, Array<To> &vals_out,
                         t_reduced_keys, t_reduced_vals, dim, folded_dim_sz);
             POST_LAUNCH_CHECK();
 
-            swap(t_reduced_keys, reduced_keys);
-            swap(t_reduced_vals, reduced_vals);
+            std::swap(t_reduced_keys, reduced_keys);
+            std::swap(t_reduced_vals, reduced_vals);
             reduce_host_event.block();
         }
     } while (needs_another_reduction_host ||
@@ -318,8 +319,8 @@ void reduce_by_key_first(Array<Tk> &keys_out, Array<To> &vals_out,
                         t_reduced_keys, t_reduced_vals, odims[2]);
             POST_LAUNCH_CHECK();
 
-            swap(t_reduced_keys, reduced_keys);
-            swap(t_reduced_vals, reduced_vals);
+            std::swap(t_reduced_keys, reduced_keys);
+            std::swap(t_reduced_vals, reduced_vals);
             reduce_host_event.block();
         }
     } while (needs_another_reduction_host ||
@@ -353,10 +354,14 @@ void reduce_by_key(Array<Tk> &keys_out, Array<To> &vals_out,
 }
 
 template<af_op_t op, typename Ti, typename To>
-To reduce_all(const Array<Ti> &in, bool change_nan, double nanval) {
-    return kernel::reduce_all<Ti, To, op>(in, change_nan, nanval);
+Array<To> reduce_all(const Array<Ti> &in, bool change_nan, double nanval) {
+    Array<To> out = createEmptyArray<To>(1);
+    kernel::reduce_all<Ti, To, op>(out, in, change_nan, nanval);
+    return out;
 }
+
 }  // namespace cuda
+}  // namespace arrayfire
 
 #define INSTANTIATE(Op, Ti, To)                                                \
     template Array<To> reduce<Op, Ti, To>(const Array<Ti> &in, const int dim,  \
@@ -367,5 +372,5 @@ To reduce_all(const Array<Ti> &in, bool change_nan, double nanval) {
     template void reduce_by_key<Op, Ti, uint, To>(                             \
         Array<uint> & keys_out, Array<To> & vals_out, const Array<uint> &keys, \
         const Array<Ti> &vals, const int dim, bool change_nan, double nanval); \
-    template To reduce_all<Op, Ti, To>(const Array<Ti> &in, bool change_nan,   \
-                                       double nanval);
+    template Array<To> reduce_all<Op, Ti, To>(const Array<Ti> &in,             \
+                                              bool change_nan, double nanval);

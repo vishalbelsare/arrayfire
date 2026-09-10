@@ -4,6 +4,7 @@
 #include <common/jit/BinaryNode.hpp>
 #include <complex.hpp>
 #include <types.hpp>
+#include <af/traits.hpp>
 
 #include <memory>
 
@@ -17,6 +18,7 @@ using detail::createNodeArray;
 
 using std::make_shared;
 
+namespace arrayfire {
 namespace common {
 #ifdef AF_CPU
 template<typename To, typename Ti, af_op_t op>
@@ -67,6 +69,7 @@ INSTANTIATE(cdouble, double, af_cplx2_t);
     INSTANTIATE(unsigned short, unsigned short, op);         \
     INSTANTIATE(unsigned long long, unsigned long long, op); \
     INSTANTIATE(long long, long long, op);                   \
+    INSTANTIATE(signed char, signed char, op);               \
     INSTANTIATE(unsigned char, unsigned char, op);           \
     INSTANTIATE(char, char, op);                             \
     INSTANTIATE(common::half, common::half, op);             \
@@ -89,6 +92,7 @@ INSTANTIATE_ARITH(af_max_t);
     INSTANTIATE(unsigned short, unsigned short, op);         \
     INSTANTIATE(unsigned long long, unsigned long long, op); \
     INSTANTIATE(long long, long long, op);                   \
+    INSTANTIATE(signed char, signed char, op);               \
     INSTANTIATE(unsigned char, unsigned char, op);           \
     INSTANTIATE(char, char, op);                             \
     INSTANTIATE(common::half, common::half, op);             \
@@ -112,6 +116,7 @@ INSTANTIATE_FLOATOPS(af_atan2_t);
     INSTANTIATE(unsigned short, unsigned short, op);         \
     INSTANTIATE(unsigned long long, unsigned long long, op); \
     INSTANTIATE(long long, long long, op);                   \
+    INSTANTIATE(signed char, signed char, op);               \
     INSTANTIATE(unsigned char, unsigned char, op);           \
     INSTANTIATE(char, char, op);                             \
     INSTANTIATE(int, int, op)
@@ -134,6 +139,7 @@ INSTANTIATE_BITOP(af_bitxor_t);
     INSTANTIATE(char, unsigned short, op);     \
     INSTANTIATE(char, unsigned long long, op); \
     INSTANTIATE(char, long long, op);          \
+    INSTANTIATE(char, signed char, op);        \
     INSTANTIATE(char, unsigned char, op);      \
     INSTANTIATE(char, char, op);               \
     INSTANTIATE(char, int, op)
@@ -151,3 +157,4 @@ INSTANTIATE_LOGIC(af_ge_t);
 #undef INSTANTIATE
 
 }  // namespace common
+}  // namespace arrayfire

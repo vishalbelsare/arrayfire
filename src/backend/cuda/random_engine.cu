@@ -13,8 +13,9 @@
 #include <af/dim4.hpp>
 #include <cassert>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cuda {
 void initMersenneState(Array<uint> &state, const uintl seed,
                        const Array<uint> &tbl) {
@@ -142,6 +143,7 @@ INSTANTIATE_UNIFORM(uint)
 INSTANTIATE_UNIFORM(intl)
 INSTANTIATE_UNIFORM(uintl)
 INSTANTIATE_UNIFORM(char)
+INSTANTIATE_UNIFORM(schar)
 INSTANTIATE_UNIFORM(uchar)
 INSTANTIATE_UNIFORM(short)
 INSTANTIATE_UNIFORM(ushort)
@@ -158,3 +160,4 @@ COMPLEX_NORMAL_DISTRIBUTION(cdouble, double)
 COMPLEX_NORMAL_DISTRIBUTION(cfloat, float)
 
 }  // namespace cuda
+}  // namespace arrayfire

@@ -10,14 +10,18 @@
 #include <common/cast.hpp>
 #include <handle.hpp>
 
-using common::half;
+using arrayfire::common::half;
 using detail::cdouble;
 using detail::cfloat;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
 using detail::ushort;
+
+namespace arrayfire {
+namespace common {
 
 template<typename To>
 detail::Array<To> castArray(const af_array &in) {
@@ -35,6 +39,7 @@ detail::Array<To> castArray(const af_array &in) {
         case c64: return common::cast<To, cdouble>(getArray<cdouble>(in));
         case s32: return common::cast<To, int>(getArray<int>(in));
         case u32: return common::cast<To, uint>(getArray<uint>(in));
+        case s8: return common::cast<To, schar>(getArray<schar>(in));
         case u8: return common::cast<To, uchar>(getArray<uchar>(in));
         case b8: return common::cast<To, char>(getArray<char>(in));
         case s64: return common::cast<To, intl>(getArray<intl>(in));
@@ -53,6 +58,7 @@ template detail::Array<cfloat> castArray(const af_array &in);
 template detail::Array<cdouble> castArray(const af_array &in);
 template detail::Array<int> castArray(const af_array &in);
 template detail::Array<uint> castArray(const af_array &in);
+template detail::Array<schar> castArray(const af_array &in);
 template detail::Array<uchar> castArray(const af_array &in);
 template detail::Array<char> castArray(const af_array &in);
 template detail::Array<intl> castArray(const af_array &in);
@@ -60,3 +66,6 @@ template detail::Array<uintl> castArray(const af_array &in);
 template detail::Array<short> castArray(const af_array &in);
 template detail::Array<ushort> castArray(const af_array &in);
 template detail::Array<half> castArray(const af_array &in);
+
+}  // namespace common
+}  // namespace arrayfire

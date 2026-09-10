@@ -17,27 +17,35 @@
 #include <common/graphics_common.hpp>
 #include <handle.hpp>
 #include <join.hpp>
+#include <platform.hpp>
 #include <plot.hpp>
 #include <reduce.hpp>
 #include <reorder.hpp>
 #include <transpose.hpp>
 
 using af::dim4;
+using arrayfire::common::ForgeManager;
+using arrayfire::common::ForgeModule;
+using arrayfire::common::forgePlugin;
+using arrayfire::common::getFGMarker;
+using arrayfire::common::getGLType;
+using arrayfire::common::makeContextCurrent;
+using arrayfire::common::step_round;
 using detail::Array;
 using detail::copy_plot;
 using detail::forgeManager;
 using detail::reduce;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::ushort;
-using namespace graphics;
 
 // Requires in_ to be in either [order, n] or [n, order] format
 template<typename T, int order>
 fg_chart setup_plot(fg_window window, const af_array in_,
                     const af_cell* const props, fg_plot_type ptype,
                     fg_marker_type mtype) {
-    ForgeModule& _ = graphics::forgePlugin();
+    ForgeModule& _ = forgePlugin();
 
     Array<T> in = getArray<T>(in_);
 
@@ -159,6 +167,10 @@ af_err plotWrapper(const af_window window, const af_array in,
                 chart = setup_plot<ushort>(window, in, dims[order_dim], props,
                                            ptype, marker);
                 break;
+            case s8:
+                chart = setup_plot<schar>(window, in, dims[order_dim], props,
+                                          ptype, marker);
+                break;
             case u8:
                 chart = setup_plot<uchar>(window, in, dims[order_dim], props,
                                           ptype, marker);
@@ -168,7 +180,7 @@ af_err plotWrapper(const af_window window, const af_array in,
 
         auto gridDims = forgeManager().getWindowGrid(window);
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         if (props->col > -1 && props->row > -1) {
             FG_CHECK(_.fg_draw_chart_to_cell(
                 window, gridDims.first, gridDims.second,
@@ -233,6 +245,9 @@ af_err plotWrapper(const af_window window, const af_array X, const af_array Y,
             case u16:
                 chart = setup_plot<ushort>(window, in, 3, props, ptype, marker);
                 break;
+            case s8:
+                chart = setup_plot<schar>(window, in, 3, props, ptype, marker);
+                break;
             case u8:
                 chart = setup_plot<uchar>(window, in, 3, props, ptype, marker);
                 break;
@@ -240,7 +255,7 @@ af_err plotWrapper(const af_window window, const af_array X, const af_array Y,
         }
         auto gridDims = forgeManager().getWindowGrid(window);
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         if (props->col > -1 && props->row > -1) {
             FG_CHECK(_.fg_draw_chart_to_cell(
                 window, gridDims.first, gridDims.second,
@@ -300,6 +315,9 @@ af_err plotWrapper(const af_window window, const af_array X, const af_array Y,
             case u16:
                 chart = setup_plot<ushort>(window, in, 2, props, ptype, marker);
                 break;
+            case s8:
+                chart = setup_plot<schar>(window, in, 2, props, ptype, marker);
+                break;
             case u8:
                 chart = setup_plot<uchar>(window, in, 2, props, ptype, marker);
                 break;
@@ -307,7 +325,7 @@ af_err plotWrapper(const af_window window, const af_array X, const af_array Y,
         }
         auto gridDims = forgeManager().getWindowGrid(window);
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         if (props->col > -1 && props->row > -1) {
             FG_CHECK(_.fg_draw_chart_to_cell(
                 window, gridDims.first, gridDims.second,
@@ -378,40 +396,52 @@ af_err af_draw_plot3(const af_window wind, const af_array P,
 af_err af_draw_scatter_nd(const af_window wind, const af_array in,
                           const af_marker_type af_marker,
                           const af_cell* const props) {
-    fg_marker_type fg_marker = getFGMarker(af_marker);
-    return plotWrapper(wind, in, 1, props, FG_PLOT_SCATTER, fg_marker);
+    try {
+        fg_marker_type fg_marker = getFGMarker(af_marker);
+        return plotWrapper(wind, in, 1, props, FG_PLOT_SCATTER, fg_marker);
+    }
+    CATCHALL;
 }
 
 af_err af_draw_scatter_2d(const af_window wind, const af_array X,
                           const af_array Y, const af_marker_type af_marker,
                           const af_cell* const props) {
-    fg_marker_type fg_marker = getFGMarker(af_marker);
-    return plotWrapper(wind, X, Y, props, FG_PLOT_SCATTER, fg_marker);
+    try {
+        fg_marker_type fg_marker = getFGMarker(af_marker);
+        return plotWrapper(wind, X, Y, props, FG_PLOT_SCATTER, fg_marker);
+    }
+    CATCHALL;
 }
 
 af_err af_draw_scatter_3d(const af_window wind, const af_array X,
                           const af_array Y, const af_array Z,
                           const af_marker_type af_marker,
                           const af_cell* const props) {
-    fg_marker_type fg_marker = getFGMarker(af_marker);
-    return plotWrapper(wind, X, Y, Z, props, FG_PLOT_SCATTER, fg_marker);
+    try {
+        fg_marker_type fg_marker = getFGMarker(af_marker);
+        return plotWrapper(wind, X, Y, Z, props, FG_PLOT_SCATTER, fg_marker);
+    }
+    CATCHALL;
 }
 
 // Deprecated Scatter API
 af_err af_draw_scatter(const af_window wind, const af_array X, const af_array Y,
                        const af_marker_type af_marker,
                        const af_cell* const props) {
-    fg_marker_type fg_marker = getFGMarker(af_marker);
-    return plotWrapper(wind, X, Y, props, FG_PLOT_SCATTER, fg_marker);
+    try {
+        fg_marker_type fg_marker = getFGMarker(af_marker);
+        return plotWrapper(wind, X, Y, props, FG_PLOT_SCATTER, fg_marker);
+    }
+    CATCHALL;
 }
 
 af_err af_draw_scatter3(const af_window wind, const af_array P,
                         const af_marker_type af_marker,
                         const af_cell* const props) {
-    fg_marker_type fg_marker = getFGMarker(af_marker);
     try {
-        const ArrayInfo& info = getInfo(P);
-        af::dim4 dims         = info.dims();
+        fg_marker_type fg_marker = getFGMarker(af_marker);
+        const ArrayInfo& info    = getInfo(P);
+        af::dim4 dims            = info.dims();
 
         if (dims.ndims() == 2 && dims[1] == 3) {
             return plotWrapper(wind, P, 1, props, FG_PLOT_SCATTER, fg_marker);

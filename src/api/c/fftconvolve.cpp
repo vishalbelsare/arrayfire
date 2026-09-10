@@ -26,7 +26,7 @@
 #include <vector>
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
 using detail::arithOp;
 using detail::Array;
 using detail::cdouble;
@@ -35,6 +35,7 @@ using detail::createSubArray;
 using detail::fftconvolve;
 using detail::intl;
 using detail::real;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -49,10 +50,11 @@ using std::vector;
 template<typename T>
 af_array fftconvolve_fallback(const af_array signal, const af_array filter,
                               const bool expand, const int baseDim) {
-    using convT =
-        typename conditional<is_integral<T>::value || is_same<T, float>::value,
-                             float, double>::type;
-    using cT = typename conditional<is_same<convT, float>::value, cfloat,
+    using convT = typename conditional<is_integral<T>::value ||
+                                           is_same<T, float>::value ||
+                                           is_same<T, cfloat>::value,
+                                       float, double>::type;
+    using cT    = typename conditional<is_same<convT, float>::value, cfloat,
                                     cdouble>::type;
 
     const Array<cT> S = castArray<cT>(signal);
@@ -210,6 +212,10 @@ af_err fft_convolve(af_array *out, const af_array signal, const af_array filter,
                 output =
                     fftconvolve<uchar>(signal, filter, expand, convBT, baseDim);
                 break;
+            case s8:
+                output =
+                    fftconvolve<schar>(signal, filter, expand, convBT, baseDim);
+                break;
             case b8:
                 output =
                     fftconvolve<char>(signal, filter, expand, convBT, baseDim);
@@ -238,18 +244,24 @@ af_err af_fft_convolve1(af_array *out, const af_array signal,
 
 af_err af_fft_convolve2(af_array *out, const af_array signal,
                         const af_array filter, const af_conv_mode mode) {
-    if (getInfo(signal).dims().ndims() < 2 &&
-        getInfo(filter).dims().ndims() < 2) {
-        return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 1);
+    try {
+        if (getInfo(signal).dims().ndims() < 2 &&
+            getInfo(filter).dims().ndims() < 2) {
+            return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 1);
+        }
+        return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 2);
     }
-    return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 2);
+    CATCHALL;
 }
 
 af_err af_fft_convolve3(af_array *out, const af_array signal,
                         const af_array filter, const af_conv_mode mode) {
-    if (getInfo(signal).dims().ndims() < 3 &&
-        getInfo(filter).dims().ndims() < 3) {
-        return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 2);
+    try {
+        if (getInfo(signal).dims().ndims() < 3 &&
+            getInfo(filter).dims().ndims() < 3) {
+            return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 2);
+        }
+        return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 3);
     }
-    return fft_convolve(out, signal, filter, mode == AF_CONV_EXPAND, 3);
+    CATCHALL;
 }

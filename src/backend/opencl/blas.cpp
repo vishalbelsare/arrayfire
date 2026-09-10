@@ -26,8 +26,9 @@
 #include <cpu/cpu_blas.hpp>
 #include <magma/magma_blas.h>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 
 void initBlas() { gpu_blas_init(); }
@@ -61,13 +62,14 @@ void gemm_fallback<half>(Array<half> & /*out*/, af_mat_prop /*optLhs*/,
     assert(false && "CPU fallback not implemented for f16");
 }
 
-template<typename T>
-void gemm(Array<T> &out, af_mat_prop optLhs, af_mat_prop optRhs, const T *alpha,
-          const Array<T> &lhs, const Array<T> &rhs, const T *beta) {
+template<typename Ti, typename To>
+void gemm(Array<To> &out, af_mat_prop optLhs, af_mat_prop optRhs,
+          const To *alpha, const Array<Ti> &lhs, const Array<Ti> &rhs,
+          const To *beta) {
 #if defined(WITH_LINEAR_ALGEBRA)
     // Do not force offload gemm on OSX Intel devices
     if (OpenCLCPUOffload(false) &&
-        static_cast<af_dtype>(dtype_traits<T>::af_type) != f16) {
+        static_cast<af_dtype>(dtype_traits<Ti>::af_type) != f16) {
         gemm_fallback(out, optLhs, optRhs, alpha, lhs, rhs, beta);
         return;
     }
@@ -113,14 +115,14 @@ void gemm(Array<T> &out, af_mat_prop optLhs, af_mat_prop optRhs, const T *alpha,
         cl::Event event;
         if (rDims[bColDim] == 1) {
             dim_t incr = (optRhs == AF_MAT_NONE) ? rStrides[0] : rStrides[1];
-            gpu_blas_gemv_func<T> gemv;
+            gpu_blas_gemv_func<Ti> gemv;
             OPENCL_BLAS_CHECK(gemv(lOpts, lDims[0], lDims[1], *alpha,
                                    (*lhs.get())(), lOffset, lStrides[1],
                                    (*rhs.get())(), rOffset, incr, *beta,
                                    (*out.get())(), oOffset, oStrides[0], 1,
                                    &getQueue()(), 0, nullptr, &event()));
         } else {
-            gpu_blas_gemm_func<T> gemm;
+            gpu_blas_gemm_func<Ti> gemm;
             OPENCL_BLAS_CHECK(gemm(lOpts, rOpts, M, N, K, *alpha,
                                    (*lhs.get())(), lOffset, lStrides[1],
                                    (*rhs.get())(), rOffset, rStrides[1], *beta,
@@ -128,6 +130,14 @@ void gemm(Array<T> &out, af_mat_prop optLhs, af_mat_prop optRhs, const T *alpha,
                                    &getQueue()(), 0, nullptr, &event()));
         }
     }
+}
+
+template<>
+void gemm<schar, float>(Array<float> &out, af_mat_prop optLhs,
+                        af_mat_prop optRhs, const float *alpha,
+                        const Array<schar> &lhs, const Array<schar> &rhs,
+                        const float *beta) {
+    TYPE_ERROR(3, af_dtype::s8);
 }
 
 template<typename T>
@@ -164,3 +174,4 @@ INSTANTIATE_DOT(cdouble)
 INSTANTIATE_DOT(half)
 
 }  // namespace opencl
+}  // namespace arrayfire

@@ -10,12 +10,15 @@
 #pragma once
 #include <af/defines.h>
 
-const char *getName(af_dtype type);
-
 // uchar to number converters
 template<typename T>
 struct ToNum {
     inline T operator()(T val) { return val; }
+};
+
+template<>
+struct ToNum<signed char> {
+    inline int operator()(signed char val) { return static_cast<int>(val); }
 };
 
 template<>

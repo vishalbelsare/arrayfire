@@ -13,8 +13,10 @@
 #include <testHelpers.hpp>
 #include <af/dim4.hpp>
 #include <af/traits.hpp>
+
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using af::array;
@@ -33,10 +35,10 @@ template<typename T>
 class Replace : public ::testing::Test {};
 
 typedef ::testing::Types<half_float::half, float, double, cfloat, cdouble, uint,
-                         int, intl, uintl, uchar, char, short, ushort>
+                         int, intl, uintl, schar, uchar, char, short, ushort>
     TestTypes;
 
-TYPED_TEST_CASE(Replace, TestTypes);
+TYPED_TEST_SUITE(Replace, TestTypes);
 
 template<typename T>
 void replaceTest(const dim4 &dims) {
@@ -77,6 +79,11 @@ void replaceTest(const dim4 &dims) {
 template<typename T>
 void replaceScalarTest(const dim4 &dims) {
     SUPPORTED_TYPE_CHECK(T);
+    using scalar_t =
+        typename std::conditional<std::is_same<T, intl>::value ||
+                                      std::is_same<T, uintl>::value,
+                                  T, double>::type;
+
     dtype ty = (dtype)dtype_traits<T>::af_type;
 
     array a = randu(dims, ty);
@@ -85,7 +92,7 @@ void replaceScalarTest(const dim4 &dims) {
 
     array c    = a.copy();
     array cond = randu(dims, ty) > a;
-    double b   = 3;
+    scalar_t b = static_cast<scalar_t>(3);
 
     replace(c, cond, b);
     int num = (int)a.elements();
@@ -106,6 +113,7 @@ TYPED_TEST(Replace, Simple) { replaceTest<TypeParam>(dim4(1024, 1024)); }
 TYPED_TEST(Replace, Scalar) { replaceScalarTest<TypeParam>(dim4(5, 5)); }
 
 TEST(Replace, NaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     dim4 dims(1000, 1250);
     dtype ty = f32;
 
@@ -134,7 +142,8 @@ TEST(Replace, ISSUE_1249) {
     array a    = randu(dims);
     array b    = a.copy();
     replace(b, !cond, a - a * 0.9);
-    array c = a - a * cond * 0.9;
+    array c  = (a - a * 0.9);
+    c(!cond) = a(!cond);
 
     int num = (int)dims.elements();
     vector<float> hb(num);
@@ -143,7 +152,9 @@ TEST(Replace, ISSUE_1249) {
     b.host(&hb[0]);
     c.host(&hc[0]);
 
-    for (int i = 0; i < num; i++) { ASSERT_EQ(hc[i], hb[i]) << "at " << i; }
+    for (int i = 0; i < num; i++) {
+        ASSERT_FLOAT_EQ(hc[i], hb[i]) << "at " << i;
+    }
 }
 
 TEST(Replace, 4D) {
@@ -161,7 +172,9 @@ TEST(Replace, 4D) {
     b.host(&hb[0]);
     c.host(&hc[0]);
 
-    for (int i = 0; i < num; i++) { ASSERT_EQ(hc[i], hb[i]) << "at " << i; }
+    for (int i = 0; i < num; i++) {
+        ASSERT_FLOAT_EQ(hc[i], hb[i]) << "at " << i;
+    }
 }
 
 TEST(Replace, ISSUE_1683) {
@@ -170,7 +183,7 @@ TEST(Replace, ISSUE_1683) {
     A.host(ha1.data());
 
     array B = A(0, span);
-    replace(B, A(0, span) > 0.5, 0);
+    replace(B, A(0, span) > 0.5, 0.0);
 
     vector<float> ha2(A.elements());
     A.host(ha2.data());
@@ -179,12 +192,14 @@ TEST(Replace, ISSUE_1683) {
     B.host(hb.data());
 
     // Ensures A is not modified by replace
-    for (int i = 0; i < (int)A.elements(); i++) { ASSERT_EQ(ha1[i], ha2[i]); }
+    for (int i = 0; i < (int)A.elements(); i++) {
+        ASSERT_FLOAT_EQ(ha1[i], ha2[i]);
+    }
 
     // Ensures replace on B works as expected
     for (int i = 0; i < (int)B.elements(); i++) {
         float val = ha1[i * A.dims(0)];
         val       = val < 0.5 ? 0 : val;
-        ASSERT_EQ(val, hb[i]);
+        ASSERT_FLOAT_EQ(val, hb[i]);
     }
 }

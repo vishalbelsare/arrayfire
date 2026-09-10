@@ -13,6 +13,7 @@
 #include <thrust_utils.hpp>
 #include <types.hpp>
 
+namespace arrayfire {
 namespace cuda {
 namespace kernel {
 // Wrapper functions
@@ -38,6 +39,7 @@ void thrustSortByKey(Tk *keyPtr, Tv *valPtr, int elements, bool isAscending) {
     INSTANTIATE(Tk, cfloat)  \
     INSTANTIATE(Tk, cdouble) \
     INSTANTIATE(Tk, char)    \
+    INSTANTIATE(Tk, schar)   \
     INSTANTIATE(Tk, uchar)
 
 #define INSTANTIATE1(Tk)    \
@@ -50,3 +52,4 @@ void thrustSortByKey(Tk *keyPtr, Tv *valPtr, int elements, bool isAscending) {
 
 }  // namespace kernel
 }  // namespace cuda
+}  // namespace arrayfire

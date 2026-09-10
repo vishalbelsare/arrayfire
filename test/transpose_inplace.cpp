@@ -30,12 +30,12 @@ class Transpose : public ::testing::Test {
 };
 
 // create a list of types to be tested
-typedef ::testing::Types<float, cfloat, double, cdouble, int, uint, char, uchar,
-                         short, ushort>
+typedef ::testing::Types<float, cfloat, double, cdouble, int, uint, char, schar,
+                         uchar, short, ushort>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Transpose, TestTypes);
+TYPED_TEST_SUITE(Transpose, TestTypes);
 
 template<typename T>
 void transposeip_test(dim4 dims) {

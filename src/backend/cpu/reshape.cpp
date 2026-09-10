@@ -14,6 +14,7 @@
 #include <platform.hpp>
 #include <queue.hpp>
 
+namespace arrayfire {
 namespace cpu {
 template<typename T>
 void multiply_inplace(Array<T> &in, double val) {
@@ -39,6 +40,7 @@ INSTANTIATE(cfloat)
 INSTANTIATE(cdouble)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(intl)
@@ -67,6 +69,8 @@ INSTANTIATE(ushort)
                                                 const dim4 &, short, double); \
     template Array<ushort> reshape<SRC_T, ushort>(                            \
         const Array<SRC_T> &, const dim4 &, ushort, double);                  \
+    template Array<schar> reshape<SRC_T, schar>(const Array<SRC_T> &,         \
+                                                const dim4 &, schar, double); \
     template Array<uchar> reshape<SRC_T, uchar>(const Array<SRC_T> &,         \
                                                 const dim4 &, uchar, double); \
     template Array<char> reshape<SRC_T, char>(const Array<SRC_T> &,           \
@@ -78,11 +82,12 @@ INSTANTIATE_PAD_ARRAY(int)
 INSTANTIATE_PAD_ARRAY(uint)
 INSTANTIATE_PAD_ARRAY(intl)
 INSTANTIATE_PAD_ARRAY(uintl)
+INSTANTIATE_PAD_ARRAY(schar)
 INSTANTIATE_PAD_ARRAY(uchar)
 INSTANTIATE_PAD_ARRAY(char)
 INSTANTIATE_PAD_ARRAY(ushort)
 INSTANTIATE_PAD_ARRAY(short)
-INSTANTIATE_PAD_ARRAY(common::half)
+INSTANTIATE_PAD_ARRAY(arrayfire::common::half)
 
 #define INSTANTIATE_PAD_ARRAY_COMPLEX(SRC_T)                 \
     template Array<cfloat> reshape<SRC_T, cfloat>(           \
@@ -93,3 +98,4 @@ INSTANTIATE_PAD_ARRAY(common::half)
 INSTANTIATE_PAD_ARRAY_COMPLEX(cfloat)
 INSTANTIATE_PAD_ARRAY_COMPLEX(cdouble)
 }  // namespace cpu
+}  // namespace arrayfire

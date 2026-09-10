@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <functional>
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T, int dim>
@@ -97,6 +98,7 @@ INSTANTIATE(double)
 INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(char)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
@@ -104,3 +106,4 @@ INSTANTIATE(intl)
 INSTANTIATE(uintl)
 
 }  // namespace cpu
+}  // namespace arrayfire

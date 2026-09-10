@@ -15,8 +15,10 @@
 #include <platform.hpp>
 #include <queue.hpp>
 
-using common::half;  // NOLINT(misc-unused-using-decls) bug in clang-tidy
+using arrayfire::common::half;  // NOLINT(misc-unused-using-decls) bug in
+                                // clang-tidy
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
@@ -39,9 +41,11 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(half)
 
 }  // namespace cpu
+}  // namespace arrayfire

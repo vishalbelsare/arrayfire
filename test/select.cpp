@@ -11,13 +11,13 @@
 #include <gtest/gtest.h>
 #include <half.hpp>
 #include <testHelpers.hpp>
-
 #include <af/dim4.hpp>
 #include <af/traits.hpp>
 
 #include <cstdio>
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using af::array;
@@ -42,9 +42,9 @@ template<typename T>
 class Select : public ::testing::Test {};
 
 typedef ::testing::Types<float, double, cfloat, cdouble, uint, int, intl, uintl,
-                         uchar, char, short, ushort, half_float::half>
+                         schar, uchar, char, short, ushort, half_float::half>
     TestTypes;
-TYPED_TEST_CASE(Select, TestTypes);
+TYPED_TEST_SUITE(Select, TestTypes);
 
 template<typename T>
 void selectTest(const dim4& dims) {
@@ -83,11 +83,16 @@ void selectTest(const dim4& dims) {
 template<typename T, bool is_right>
 void selectScalarTest(const dim4& dims) {
     SUPPORTED_TYPE_CHECK(T);
+    using scalar_t =
+        typename std::conditional<std::is_same<T, intl>::value ||
+                                      std::is_same<T, uintl>::value,
+                                  T, double>::type;
+
     dtype ty = (dtype)dtype_traits<T>::af_type;
 
     array a    = randu(dims, ty);
     array cond = randu(dims, ty) > a;
-    double b   = 3;
+    scalar_t b = static_cast<scalar_t>(3);
 
     if (a.isinteger()) { a = (a % (1 << 30)).as(ty); }
 
@@ -125,6 +130,7 @@ TYPED_TEST(Select, LeftScalar) {
 }
 
 TEST(Select, NaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     dim4 dims(1000, 1250);
     dtype ty = f32;
 
@@ -332,17 +338,17 @@ vector<select_params> getSelectTestParams(int M, int N) {
     return vector<select_params>(_, _ + sizeof(_) / sizeof(_[0]));
 }
 
-INSTANTIATE_TEST_CASE_P(SmallDims, Select_,
-                        ::testing::ValuesIn(getSelectTestParams(10, 5)),
-                        testNameGenerator);
+INSTANTIATE_TEST_SUITE_P(SmallDims, Select_,
+                         ::testing::ValuesIn(getSelectTestParams(10, 5)),
+                         testNameGenerator);
 
-INSTANTIATE_TEST_CASE_P(Dims33_9, Select_,
-                        ::testing::ValuesIn(getSelectTestParams(33, 9)),
-                        testNameGenerator);
+INSTANTIATE_TEST_SUITE_P(Dims33_9, Select_,
+                         ::testing::ValuesIn(getSelectTestParams(33, 9)),
+                         testNameGenerator);
 
-INSTANTIATE_TEST_CASE_P(DimsLg, Select_,
-                        ::testing::ValuesIn(getSelectTestParams(512, 32)),
-                        testNameGenerator);
+INSTANTIATE_TEST_SUITE_P(DimsLg, Select_,
+                         ::testing::ValuesIn(getSelectTestParams(512, 32)),
+                         testNameGenerator);
 
 TEST_P(Select_, Batch) {
     select_params params = GetParam();
@@ -399,17 +405,17 @@ string testNameGeneratorLR(
     return ss.str();
 }
 
-INSTANTIATE_TEST_CASE_P(SmallDims, SelectLR_,
-                        ::testing::ValuesIn(getSelectLRTestParams(10, 5)),
-                        testNameGeneratorLR);
+INSTANTIATE_TEST_SUITE_P(SmallDims, SelectLR_,
+                         ::testing::ValuesIn(getSelectLRTestParams(10, 5)),
+                         testNameGeneratorLR);
 
-INSTANTIATE_TEST_CASE_P(Dims33_9, SelectLR_,
-                        ::testing::ValuesIn(getSelectLRTestParams(33, 9)),
-                        testNameGeneratorLR);
+INSTANTIATE_TEST_SUITE_P(Dims33_9, SelectLR_,
+                         ::testing::ValuesIn(getSelectLRTestParams(33, 9)),
+                         testNameGeneratorLR);
 
-INSTANTIATE_TEST_CASE_P(DimsLg, SelectLR_,
-                        ::testing::ValuesIn(getSelectLRTestParams(512, 32)),
-                        testNameGeneratorLR);
+INSTANTIATE_TEST_SUITE_P(DimsLg, SelectLR_,
+                         ::testing::ValuesIn(getSelectLRTestParams(512, 32)),
+                         testNameGeneratorLR);
 
 TEST_P(SelectLR_, BatchL) {
     selectlr_params params = GetParam();

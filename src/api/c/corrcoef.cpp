@@ -11,6 +11,7 @@
 #include <backend.hpp>
 #include <common/cast.hpp>
 #include <common/err_common.hpp>
+#include <copy.hpp>
 #include <handle.hpp>
 #include <math.hpp>
 #include <reduce.hpp>
@@ -23,11 +24,13 @@
 #include <cmath>
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
 using detail::arithOp;
 using detail::Array;
+using detail::getScalar;
 using detail::intl;
 using detail::reduce_all;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -41,16 +44,16 @@ static To corrcoef(const af_array& X, const af_array& Y) {
     const dim4& dims = xIn.dims();
     dim_t n          = xIn.elements();
 
-    To xSum = reduce_all<af_add_t, To, To>(xIn);
-    To ySum = reduce_all<af_add_t, To, To>(yIn);
+    To xSum = getScalar<To>(reduce_all<af_add_t, To, To>(xIn));
+    To ySum = getScalar<To>(reduce_all<af_add_t, To, To>(yIn));
 
     Array<To> xSq = arithOp<To, af_mul_t>(xIn, xIn, dims);
     Array<To> ySq = arithOp<To, af_mul_t>(yIn, yIn, dims);
     Array<To> xy  = arithOp<To, af_mul_t>(xIn, yIn, dims);
 
-    To xSqSum = reduce_all<af_add_t, To, To>(xSq);
-    To ySqSum = reduce_all<af_add_t, To, To>(ySq);
-    To xySum  = reduce_all<af_add_t, To, To>(xy);
+    To xSqSum = getScalar<To>(reduce_all<af_add_t, To, To>(xSq));
+    To ySqSum = getScalar<To>(reduce_all<af_add_t, To, To>(ySq));
+    To xySum  = getScalar<To>(reduce_all<af_add_t, To, To>(xy));
 
     To result =
         (n * xySum - xSum * ySum) / (std::sqrt(n * xSqSum - xSum * xSum) *
@@ -87,6 +90,7 @@ af_err af_corrcoef(double* realVal, double* imagVal, const af_array X,
             case u64: *realVal = corrcoef<uintl, double>(X, Y); break;
             case s16: *realVal = corrcoef<short, float>(X, Y); break;
             case u16: *realVal = corrcoef<ushort, float>(X, Y); break;
+            case s8: *realVal = corrcoef<schar, float>(X, Y); break;
             case u8: *realVal = corrcoef<uchar, float>(X, Y); break;
             case b8: *realVal = corrcoef<char, float>(X, Y); break;
             default: TYPE_ERROR(1, xType);

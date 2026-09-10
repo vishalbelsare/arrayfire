@@ -32,19 +32,21 @@ using std::swap;
 using std::vector;
 
 using af::dim4;
-using common::convert2Canonical;
-using common::createSpanIndex;
-using common::flat;
-using common::half;
+using arrayfire::common::convert2Canonical;
+using arrayfire::common::createSpanIndex;
+using arrayfire::common::flat;
+using arrayfire::common::half;
 using detail::cdouble;
 using detail::cfloat;
 using detail::index;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
 using detail::ushort;
 
+namespace arrayfire {
 namespace common {
 af_index_t createSpanIndex() {
     static af_index_t s = [] {
@@ -64,6 +66,7 @@ af_seq convert2Canonical(const af_seq s, const dim_t len) {
     return af_seq{begin, end, s.step};
 }
 }  // namespace common
+}  // namespace arrayfire
 
 template<typename T>
 static af_array indexBySeqs(const af_array& src,
@@ -113,6 +116,7 @@ af_err af_index(af_array* result, const af_array in, const unsigned ndims,
             case u16: out = indexBySeqs<ushort>(in, indices_); break;
             case s64: out = indexBySeqs<intl>(in, indices_); break;
             case u64: out = indexBySeqs<uintl>(in, indices_); break;
+            case s8: out = indexBySeqs<schar>(in, indices_); break;
             case u8: out = indexBySeqs<uchar>(in, indices_); break;
             case f16: out = indexBySeqs<half>(in, indices_); break;
             default: TYPE_ERROR(1, type);
@@ -146,6 +150,7 @@ static af_array lookup(const af_array& in, const af_array& idx,
         case u64: return lookup<uintl, idx_t>(in, idx, dim);
         case s16: return lookup<short, idx_t>(in, idx, dim);
         case u16: return lookup<ushort, idx_t>(in, idx, dim);
+        case s8: return lookup<schar, idx_t>(in, idx, dim);
         case u8: return lookup<uchar, idx_t>(in, idx, dim);
         case b8: return lookup<char, idx_t>(in, idx, dim);
         case f16: return lookup<half, idx_t>(in, idx, dim);
@@ -173,21 +178,34 @@ af_err af_lookup(af_array* out, const af_array in, const af_array indices,
         ARG_ASSERT(2, (idxType != b8));
 
         af_array output = 0;
+        af_array idx = 0;
+
+        if (!idxInfo.isColumn()) {
+            // Force a deep copy to flatten the array and handle subarrays of not column vector arrays correctly
+            AF_CHECK(af_copy_array(&idx, indices)); 
+        } else {
+            idx = indices;
+        }
 
         switch (idxType) {
-            case f32: output = lookup<float>(in, indices, dim); break;
-            case f64: output = lookup<double>(in, indices, dim); break;
+            case f32: output = lookup<float>(in, idx, dim); break;
+            case f64: output = lookup<double>(in, idx, dim); break;
             case s32: output = lookup<int>(in, indices, dim); break;
-            case u32: output = lookup<unsigned>(in, indices, dim); break;
-            case s16: output = lookup<short>(in, indices, dim); break;
-            case u16: output = lookup<ushort>(in, indices, dim); break;
-            case s64: output = lookup<intl>(in, indices, dim); break;
-            case u64: output = lookup<uintl>(in, indices, dim); break;
-            case u8: output = lookup<uchar>(in, indices, dim); break;
-            case f16: output = lookup<half>(in, indices, dim); break;
+            case u32: output = lookup<unsigned>(in, idx, dim); break;
+            case s16: output = lookup<short>(in, idx, dim); break;
+            case u16: output = lookup<ushort>(in, idx, dim); break;
+            case s64: output = lookup<intl>(in, idx, dim); break;
+            case u64: output = lookup<uintl>(in, idx, dim); break;
+            case s8: output = lookup<schar>(in, idx, dim); break;
+            case u8: output = lookup<uchar>(in, idx, dim); break;
+            case f16: output = lookup<half>(in, idx, dim); break;
             default: TYPE_ERROR(1, idxType);
         }
         std::swap(*out, output);
+
+        if (idx != indices) {
+            AF_CHECK(af_release_array(idx)); // Release indices array if a copy has been made
+        }
     }
     CATCHALL;
     return AF_SUCCESS;
@@ -287,6 +305,7 @@ af_err af_index_gen(af_array* out, const af_array in, const dim_t ndims,
             case s32: output = genIndex<int>(in, ptr); break;
             case u16: output = genIndex<ushort>(in, ptr); break;
             case s16: output = genIndex<short>(in, ptr); break;
+            case s8: output = genIndex<schar>(in, ptr); break;
             case u8: output = genIndex<uchar>(in, ptr); break;
             case b8: output = genIndex<char>(in, ptr); break;
             case f16: output = genIndex<half>(in, ptr); break;

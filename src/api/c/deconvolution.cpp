@@ -19,6 +19,7 @@
 #include <fftconvolve.hpp>
 #include <handle.hpp>
 #include <logic.hpp>
+#include <math.hpp>
 #include <reduce.hpp>
 #include <select.hpp>
 #include <shift.hpp>
@@ -32,7 +33,7 @@
 #include <vector>
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
 using detail::arithOp;
 using detail::Array;
 using detail::cdouble;
@@ -42,6 +43,7 @@ using detail::createValueArray;
 using detail::logicOp;
 using detail::padArrayBorders;
 using detail::scalar;
+using detail::schar;
 using detail::select_scalar;
 using detail::shift;
 using detail::uchar;
@@ -67,9 +69,8 @@ const dim_t GREATEST_PRIME_FACTOR = 7;
 
 template<typename T, typename CT>
 Array<T> complexNorm(const Array<CT>& input) {
-    auto mag  = detail::abs<T, CT>(input);
-    auto TWOS = createValueArray(input.dims(), scalar<T>(2));
-    return arithOp<T, af_pow_t>(mag, TWOS, input.dims());
+    auto mag = detail::abs<T, CT>(input);
+    return arithOp<T, af_mul_t>(mag, mag, input.dims());
 }
 
 std::vector<af_seq> calcPadInfo(dim4& inLPad, dim4& psfLPad, dim4& inUPad,
@@ -226,6 +227,7 @@ af_err af_iterative_deconv(af_array* out, const af_array in, const af_array ker,
             case u16:
                 res = iterDeconv<ushort>(in, ker, iters, rfac, algo);
                 break;
+            case s8: res = iterDeconv<schar>(in, ker, iters, rfac, algo); break;
             case u8: res = iterDeconv<uchar>(in, ker, iters, rfac, algo); break;
             default: TYPE_ERROR(1, inputType);
         }
@@ -294,7 +296,7 @@ af_array invDeconv(const af_array in, const af_array ker, const float gamma,
     auto cond   = logicOp<T, af_ge_t>(absVal, THRESH, absVal.dims());
     auto val    = arithOp<CT, af_div_t>(numer, denom, numer.dims());
 
-    select_scalar<CT, false>(val, cond, val, 0);
+    select_scalar<CT, false>(val, cond, val, scalar<CT>(0.0));
 
     auto ival =
         fft_c2r<CT, T>(val, 1 / static_cast<double>(nElems), odims, BASE_DIM);
@@ -323,6 +325,7 @@ af_err af_inverse_deconv(af_array* out, const af_array in, const af_array psf,
             case f32: res = invDeconv<float>(in, psf, gamma, algo); break;
             case s16: res = invDeconv<short>(in, psf, gamma, algo); break;
             case u16: res = invDeconv<ushort>(in, psf, gamma, algo); break;
+            case s8: res = invDeconv<schar>(in, psf, gamma, algo); break;
             case u8: res = invDeconv<uchar>(in, psf, gamma, algo); break;
             default: TYPE_ERROR(1, inputType);
         }

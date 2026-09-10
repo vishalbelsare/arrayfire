@@ -10,8 +10,9 @@
 #include <common/half.hpp>
 #include "reduce_impl.hpp"
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 // max
 INSTANTIATE(af_max_t, float, float)
@@ -23,8 +24,10 @@ INSTANTIATE(af_max_t, uint, uint)
 INSTANTIATE(af_max_t, intl, intl)
 INSTANTIATE(af_max_t, uintl, uintl)
 INSTANTIATE(af_max_t, char, char)
+INSTANTIATE(af_max_t, schar, schar)
 INSTANTIATE(af_max_t, uchar, uchar)
 INSTANTIATE(af_max_t, short, short)
 INSTANTIATE(af_max_t, ushort, ushort)
 INSTANTIATE(af_max_t, half, half)
 }  // namespace opencl
+}  // namespace arrayfire

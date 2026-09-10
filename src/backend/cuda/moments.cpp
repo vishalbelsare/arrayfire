@@ -14,6 +14,7 @@
 #include <err_cuda.hpp>
 #include <kernel/moments.hpp>
 
+namespace arrayfire {
 namespace cuda {
 
 static inline unsigned bitCount(unsigned v) {
@@ -50,9 +51,11 @@ INSTANTIATE(float)
 INSTANTIATE(double)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(ushort)
 INSTANTIATE(short)
 
 }  // namespace cuda
+}  // namespace arrayfire

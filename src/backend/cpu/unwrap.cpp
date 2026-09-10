@@ -15,8 +15,9 @@
 #include <platform.hpp>
 #include <unwrap.hpp>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cpu {
 template<typename T>
 Array<T> unwrap(const Array<T> &in, const dim_t wx, const dim_t wy,
@@ -54,6 +55,7 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(short)
@@ -62,3 +64,4 @@ INSTANTIATE(half)
 #undef INSTANTIATE
 
 }  // namespace cpu
+}  // namespace arrayfire

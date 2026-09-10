@@ -19,20 +19,22 @@
 #include <af/array.h>
 #include <af/data.h>
 #include <af/defines.h>
+#include <af/device.h>
 #include <af/dim4.hpp>
+#include <map>
 #include <memory>
 
 using af::dim4;
-using common::half;
-using common::mask;
-using common::MaxBlocks;
-using common::MtStateLength;
-using common::pos;
-using common::recursion_tbl;
-using common::sh1;
-using common::sh2;
-using common::TableLength;
-using common::temper_tbl;
+using arrayfire::common::half;
+using arrayfire::common::mask;
+using arrayfire::common::MaxBlocks;
+using arrayfire::common::MtStateLength;
+using arrayfire::common::pos;
+using arrayfire::common::recursion_tbl;
+using arrayfire::common::sh1;
+using arrayfire::common::sh2;
+using arrayfire::common::TableLength;
+using arrayfire::common::temper_tbl;
 using detail::Array;
 using detail::cdouble;
 using detail::cfloat;
@@ -40,6 +42,7 @@ using detail::createEmptyArray;
 using detail::createHostDataArray;
 using detail::intl;
 using detail::normalDistribution;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -128,8 +131,20 @@ af_err af_get_default_random_engine(af_random_engine *r) {
     try {
         AF_CHECK(af_init());
 
-        thread_local auto *re = new RandomEngine;
-        *r                    = static_cast<af_random_engine>(re);
+        // RandomEngine contains device buffers which are dependent on
+        // context|stream/device. Since nor context or stream are available at
+        // this level, we will only use the deviceId.
+        thread_local std::map<int /*deviceId*/, RandomEngine *>
+            cachedDefaultRandomEngines;
+        const int dependent = af::getDevice();
+        auto it             = cachedDefaultRandomEngines.find(dependent);
+        if (it == cachedDefaultRandomEngines.end()) {
+            RandomEngine *defaultRandomEngine     = new RandomEngine;
+            cachedDefaultRandomEngines[dependent] = defaultRandomEngine;
+            *r = static_cast<af_random_engine>(defaultRandomEngine);
+        } else {
+            *r = static_cast<af_random_engine>(it->second);
+        }
         return AF_SUCCESS;
     }
     CATCHALL;
@@ -282,6 +297,7 @@ af_err af_random_uniform(af_array *out, const unsigned ndims,
             case u64: result = uniformDistribution_<uintl>(d, e); break;
             case s16: result = uniformDistribution_<short>(d, e); break;
             case u16: result = uniformDistribution_<ushort>(d, e); break;
+            case s8: result = uniformDistribution_<schar>(d, e); break;
             case u8: result = uniformDistribution_<uchar>(d, e); break;
             case b8: result = uniformDistribution_<char>(d, e); break;
             case f16: result = uniformDistribution_<half>(d, e); break;
@@ -348,6 +364,7 @@ af_err af_randu(af_array *out, const unsigned ndims, const dim_t *const dims,
             case u64: result = uniformDistribution_<uintl>(d, e); break;
             case s16: result = uniformDistribution_<short>(d, e); break;
             case u16: result = uniformDistribution_<ushort>(d, e); break;
+            case s8: result = uniformDistribution_<schar>(d, e); break;
             case u8: result = uniformDistribution_<uchar>(d, e); break;
             case b8: result = uniformDistribution_<char>(d, e); break;
             case f16: result = uniformDistribution_<half>(d, e); break;

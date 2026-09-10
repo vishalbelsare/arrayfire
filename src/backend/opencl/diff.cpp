@@ -13,6 +13,7 @@
 #include <af/dim4.hpp>
 #include <stdexcept>
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T>
@@ -49,6 +50,7 @@ INSTANTIATE(cfloat)
 INSTANTIATE(cdouble)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
@@ -56,3 +58,4 @@ INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(char)
 }  // namespace opencl
+}  // namespace arrayfire

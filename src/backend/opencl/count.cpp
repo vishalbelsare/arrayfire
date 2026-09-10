@@ -10,8 +10,9 @@
 #include <common/half.hpp>
 #include "reduce_impl.hpp"
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 // count
 INSTANTIATE(af_notzero_t, float, uint)
@@ -23,8 +24,10 @@ INSTANTIATE(af_notzero_t, uint, uint)
 INSTANTIATE(af_notzero_t, intl, uint)
 INSTANTIATE(af_notzero_t, uintl, uint)
 INSTANTIATE(af_notzero_t, char, uint)
+INSTANTIATE(af_notzero_t, schar, uint)
 INSTANTIATE(af_notzero_t, uchar, uint)
 INSTANTIATE(af_notzero_t, short, uint)
 INSTANTIATE(af_notzero_t, ushort, uint)
 INSTANTIATE(af_notzero_t, half, uint)
 }  // namespace opencl
+}  // namespace arrayfire

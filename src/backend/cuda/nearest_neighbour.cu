@@ -17,6 +17,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace cuda {
 
 template<typename T, typename To>
@@ -66,6 +67,7 @@ INSTANTIATE(int, int)
 INSTANTIATE(uint, uint)
 INSTANTIATE(intl, intl)
 INSTANTIATE(uintl, uintl)
+INSTANTIATE(schar, int)
 INSTANTIATE(uchar, uint)
 INSTANTIATE(short, int)
 INSTANTIATE(ushort, uint)
@@ -73,3 +75,4 @@ INSTANTIATE(ushort, uint)
 INSTANTIATE(uintl, uint)  // For Hamming
 
 }  // namespace cuda
+}  // namespace arrayfire

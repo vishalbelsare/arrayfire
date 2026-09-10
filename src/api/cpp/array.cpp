@@ -36,6 +36,7 @@
 #ifdef AF_UNIFIED
 #include <symbol_manager.hpp>
 #include <af/backend.h>
+using arrayfire::common::getFunctionPointer;
 #endif
 
 #include <memory>
@@ -166,9 +167,9 @@ struct array::array_proxy::array_proxy_impl {
         if (delete_on_destruction_) { delete parent_; }
     }
 
-    array_proxy_impl(const array_proxy_impl &)  = delete;
-    array_proxy_impl(const array_proxy_impl &&) = delete;
-    array_proxy_impl operator=(const array_proxy_impl &) = delete;
+    array_proxy_impl(const array_proxy_impl &)            = delete;
+    array_proxy_impl(const array_proxy_impl &&)           = delete;
+    array_proxy_impl operator=(const array_proxy_impl &)  = delete;
     array_proxy_impl operator=(const array_proxy_impl &&) = delete;
 };
 
@@ -235,6 +236,7 @@ INSTANTIATE(double)
 INSTANTIATE(float)
 INSTANTIATE(unsigned)
 INSTANTIATE(int)
+INSTANTIATE(signed char)
 INSTANTIATE(unsigned char)
 INSTANTIATE(char)
 INSTANTIATE(long long)
@@ -255,34 +257,46 @@ array::~array() {
         std::add_pointer<decltype(af_release_array)>::type;
 
     if (get()) {
-        af_backend backend = unified::getActiveBackend();
+        af_backend backend = arrayfire::unified::getActiveBackend();
         af_err err         = af_get_backend_id(&backend, get());
         if (!err) {
             switch (backend) {
                 case AF_BACKEND_CPU: {
-                    static auto *cpu_handle = unified::getActiveHandle();
+                    static auto *cpu_handle =
+                        arrayfire::unified::getActiveHandle();
                     static auto release_func =
                         reinterpret_cast<af_release_array_ptr>(
-                            common::getFunctionPointer(cpu_handle,
-                                                       "af_release_array"));
+                            getFunctionPointer(cpu_handle, "af_release_array"));
                     release_func(get());
                     break;
                 }
                 case AF_BACKEND_OPENCL: {
-                    static auto *opencl_handle = unified::getActiveHandle();
+                    static auto *opencl_handle =
+                        arrayfire::unified::getActiveHandle();
                     static auto release_func =
                         reinterpret_cast<af_release_array_ptr>(
-                            common::getFunctionPointer(opencl_handle,
-                                                       "af_release_array"));
+                            getFunctionPointer(opencl_handle,
+                                               "af_release_array"));
                     release_func(get());
                     break;
                 }
                 case AF_BACKEND_CUDA: {
-                    static auto *cuda_handle = unified::getActiveHandle();
+                    static auto *cuda_handle =
+                        arrayfire::unified::getActiveHandle();
                     static auto release_func =
                         reinterpret_cast<af_release_array_ptr>(
-                            common::getFunctionPointer(cuda_handle,
-                                                       "af_release_array"));
+                            getFunctionPointer(cuda_handle,
+                                               "af_release_array"));
+                    release_func(get());
+                    break;
+                }
+                case AF_BACKEND_ONEAPI: {
+                    static auto *oneapi_handle =
+                        arrayfire::unified::getActiveHandle();
+                    static auto release_func =
+                        reinterpret_cast<af_release_array_ptr>(
+                            getFunctionPointer(oneapi_handle,
+                                               "af_release_array"));
                     release_func(get());
                     break;
                 }
@@ -688,6 +702,7 @@ MEM_FUNC(af_array, get)
     ASSIGN_TYPE(long long, OP)          \
     ASSIGN_TYPE(unsigned long long, OP) \
     ASSIGN_TYPE(char, OP)               \
+    ASSIGN_TYPE(signed char, OP)        \
     ASSIGN_TYPE(unsigned char, OP)      \
     ASSIGN_TYPE(bool, OP)               \
     ASSIGN_TYPE(short, OP)              \
@@ -815,6 +830,7 @@ array &array::operator=(const array &other) {
     ASSIGN_TYPE(long long, OP)                                    \
     ASSIGN_TYPE(unsigned long long, OP)                           \
     ASSIGN_TYPE(char, OP)                                         \
+    ASSIGN_TYPE(signed char, OP)                                  \
     ASSIGN_TYPE(unsigned char, OP)                                \
     ASSIGN_TYPE(bool, OP)                                         \
     ASSIGN_TYPE(short, OP)                                        \
@@ -850,6 +866,7 @@ ASSIGN_OP(/=, af_div)
     ASSIGN_TYPE(long long, OP)          \
     ASSIGN_TYPE(unsigned long long, OP) \
     ASSIGN_TYPE(char, OP)               \
+    ASSIGN_TYPE(signed char, OP)        \
     ASSIGN_TYPE(unsigned char, OP)      \
     ASSIGN_TYPE(bool, OP)               \
     ASSIGN_TYPE(short, OP)              \
@@ -926,6 +943,7 @@ af::dtype implicit_dtype(af::dtype scalar_type, af::dtype array_type) {
     BINARY_TYPE(long long, OP, release_func, s64)                      \
     BINARY_TYPE(unsigned long long, OP, release_func, u64)             \
     BINARY_TYPE(char, OP, release_func, b8)                            \
+    BINARY_TYPE(signed char, OP, release_func, s8)                     \
     BINARY_TYPE(unsigned char, OP, release_func, u8)                   \
     BINARY_TYPE(bool, OP, release_func, b8)                            \
     BINARY_TYPE(short, OP, release_func, s16)                          \
@@ -1025,6 +1043,7 @@ INSTANTIATE(double)
 INSTANTIATE(float)
 INSTANTIATE(unsigned)
 INSTANTIATE(int)
+INSTANTIATE(signed char)
 INSTANTIATE(unsigned char)
 INSTANTIATE(char)
 INSTANTIATE(long long)
@@ -1067,6 +1086,7 @@ INSTANTIATE(double)
 INSTANTIATE(float)
 INSTANTIATE(unsigned)
 INSTANTIATE(int)
+INSTANTIATE(signed char)
 INSTANTIATE(unsigned char)
 INSTANTIATE(char)
 INSTANTIATE(long long)

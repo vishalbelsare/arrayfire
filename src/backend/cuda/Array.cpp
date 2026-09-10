@@ -8,6 +8,7 @@
  ********************************************************/
 
 #include <Array.hpp>
+#include <common/Logger.hpp>
 #include <common/half.hpp>
 #include <common/jit/NodeIterator.hpp>
 #include <copy.hpp>
@@ -21,20 +22,22 @@
 #include <cstddef>
 #include <memory>
 #include <numeric>
-#include <utility>
+#include <vector>
 
 using af::dim4;
-using common::half;
-using common::Node;
-using common::Node_ptr;
-using common::NodeIterator;
-using cuda::jit::BufferNode;
+using arrayfire::common::half;
+using arrayfire::common::Node;
+using arrayfire::common::Node_ptr;
+using arrayfire::common::NodeIterator;
+using arrayfire::cuda::jit::BufferNode;
 
+using nonstd::span;
 using std::accumulate;
 using std::move;
 using std::shared_ptr;
 using std::vector;
 
+namespace arrayfire {
 namespace cuda {
 
 template<typename T>
@@ -55,11 +58,27 @@ std::shared_ptr<BufferNode<T>> bufferNodePtr() {
 }
 
 template<typename T>
+void checkAndMigrate(Array<T> &arr) {
+    int arr_id = arr.getDevId();
+    int cur_id = detail::getActiveDeviceId();
+    if (!isDeviceBufferAccessible(arr_id, cur_id)) {
+        static auto getLogger = [&] { return spdlog::get("platform"); };
+        AF_TRACE("Migrating array from {} to {}.", arr_id, cur_id);
+        auto migrated_data = memAlloc<T>(arr.elements());
+        CUDA_CHECK(
+            cudaMemcpyPeerAsync(migrated_data.get(), getDeviceNativeId(cur_id),
+                                arr.get(), getDeviceNativeId(arr_id),
+                                arr.elements() * sizeof(T), getActiveStream()));
+        arr.data.reset(migrated_data.release(), memFree);
+    }
+}
+
+template<typename T>
 Array<T>::Array(const af::dim4 &dims)
     : info(getActiveDeviceId(), dims, 0, calcStrides(dims),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
     , data((dims.elements() ? memAlloc<T>(dims.elements()).release() : nullptr),
-           memFree<T>)
+           memFree)
     , data_dims(dims)
     , node()
     , owner(true) {}
@@ -69,10 +88,10 @@ Array<T>::Array(const af::dim4 &dims, const T *const in_data, bool is_device,
                 bool copy_device)
     : info(getActiveDeviceId(), dims, 0, calcStrides(dims),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
-    , data(
-          ((is_device & !copy_device) ? const_cast<T *>(in_data)
-                                      : memAlloc<T>(dims.elements()).release()),
-          memFree<T>)
+    , data(((is_device && !copy_device)
+                ? const_cast<T *>(in_data)
+                : memAlloc<T>(dims.elements()).release()),
+           memFree)
     , data_dims(dims)
     , node()
     , owner(true) {
@@ -86,14 +105,14 @@ Array<T>::Array(const af::dim4 &dims, const T *const in_data, bool is_device,
         offsetof(Array<T>, info) == 0,
         "Array<T>::info must be the first member variable of Array<T>");
     if (!is_device) {
-        CUDA_CHECK(
-            cudaMemcpyAsync(data.get(), in_data, dims.elements() * sizeof(T),
-                            cudaMemcpyHostToDevice, cuda::getActiveStream()));
+        CUDA_CHECK(cudaMemcpyAsync(data.get(), in_data,
+                                   dims.elements() * sizeof(T),
+                                   cudaMemcpyHostToDevice, getActiveStream()));
         CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
     } else if (copy_device) {
         CUDA_CHECK(
             cudaMemcpyAsync(data.get(), in_data, dims.elements() * sizeof(T),
-                            cudaMemcpyDeviceToDevice, cuda::getActiveStream()));
+                            cudaMemcpyDeviceToDevice, getActiveStream()));
         CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
     }
 }
@@ -115,7 +134,7 @@ Array<T>::Array(Param<T> &tmp, bool owner_)
            af::dim4(tmp.strides[0], tmp.strides[1], tmp.strides[2],
                     tmp.strides[3]),
            static_cast<af_dtype>(dtype_traits<T>::af_type))
-    , data(tmp.ptr, owner_ ? std::function<void(T *)>(memFree<T>)
+    , data(tmp.ptr, owner_ ? std::function<void(T *)>(memFree)
                            : std::function<void(T *)>([](T * /*unused*/) {}))
     , data_dims(af::dim4(tmp.dims[0], tmp.dims[1], tmp.dims[2], tmp.dims[3]))
     , node()
@@ -128,7 +147,11 @@ Array<T>::Array(const af::dim4 &dims, common::Node_ptr n)
     , data()
     , data_dims(dims)
     , node(move(n))
-    , owner(true) {}
+    , owner(true) {
+    if (node->isBuffer()) {
+        data = std::static_pointer_cast<BufferNode<T>>(node)->getDataPointer();
+    }
+}
 
 template<typename T>
 Array<T>::Array(const af::dim4 &dims, const af::dim4 &strides, dim_t offset_,
@@ -137,7 +160,7 @@ Array<T>::Array(const af::dim4 &dims, const af::dim4 &strides, dim_t offset_,
            static_cast<af_dtype>(dtype_traits<T>::af_type))
     , data(is_device ? const_cast<T *>(in_data)
                      : memAlloc<T>(info.total()).release(),
-           memFree<T>)
+           memFree)
     , data_dims(dims)
     , node()
     , owner(true) {
@@ -155,7 +178,7 @@ void Array<T>::eval() {
     if (isReady()) { return; }
 
     this->setId(getActiveDeviceId());
-    this->data = shared_ptr<T>(memAlloc<T>(elements()).release(), memFree<T>);
+    this->data = shared_ptr<T>(memAlloc<T>(elements()).release(), memFree);
 
     Param<T> p(data.get(), dims().get(), strides().get());
     evalNodes<T>(p, node.get());
@@ -198,7 +221,7 @@ void evalMultiple(std::vector<Array<T> *> arrays) {
 
         array->setId(getActiveDeviceId());
         array->data =
-            shared_ptr<T>(memAlloc<T>(array->elements()).release(), memFree<T>);
+            shared_ptr<T>(memAlloc<T>(array->elements()).release(), memFree);
 
         output_params.emplace_back(array->getData().get(), array->dims().get(),
                                    array->strides().get());
@@ -245,27 +268,38 @@ Node_ptr Array<T>::getNode() const {
 /// 2. The number of parameters we are passing into the kernel exceeds the
 ///    limitation on the platform. For NVIDIA this is 4096 bytes. The
 template<typename T>
-kJITHeuristics passesJitHeuristics(Node *root_node) {
+kJITHeuristics passesJitHeuristics(span<Node *> root_nodes) {
     if (!evalFlag()) { return kJITHeuristics::Pass; }
-    if (root_node->getHeight() > static_cast<int>(getMaxJitSize())) {
-        return kJITHeuristics::TreeHeight;
+    static auto getLogger = [&] { return spdlog::get("jit"); };
+    for (Node *n : root_nodes) {
+        if (n->getHeight() > static_cast<int>(getMaxJitSize())) {
+            AF_TRACE(
+                "JIT tree evaluated because of tree height exceeds limit: {} > "
+                "{}",
+                n->getHeight(), getMaxJitSize());
+            return kJITHeuristics::TreeHeight;
+        }
     }
 
     // A lightweight check based on the height of the node. This is an
     // inexpensive operation and does not traverse the JIT tree.
-    if (root_node->getHeight() > 6 ||
-        getMemoryPressure() >= getMemoryPressureThreshold()) {
+    int heightCheckLimit = 6;
+    bool atHeightLimit =
+        std::any_of(std::begin(root_nodes), std::end(root_nodes),
+                    [heightCheckLimit](Node *n) {
+                        return (n->getHeight() + 1 >= heightCheckLimit);
+                    });
+    if (atHeightLimit || getMemoryPressure() >= getMemoryPressureThreshold()) {
         // The size of the parameters without any extra arguments from the
         // JIT tree. This includes one output Param object and 4 integers.
-        constexpr size_t base_param_size =
-            sizeof(Param<T>) + (4 * sizeof(uint));
+        size_t base_param_size =
+            sizeof(Param<T>) * root_nodes.size() + (4 * sizeof(uint));
 
         // extra padding for safety to avoid failure during compilation
         constexpr size_t jit_padding_size = 256;  //@umar dontfix!
         // This is the maximum size of the params that can be allowed by the
         // CUDA platform.
-        constexpr size_t max_param_size =
-            4096 - base_param_size - jit_padding_size;
+        size_t max_param_size = 4096 - base_param_size - jit_padding_size;
 
         struct tree_info {
             size_t total_buffer_size;
@@ -273,22 +307,26 @@ kJITHeuristics passesJitHeuristics(Node *root_node) {
             size_t param_scalar_size;
         };
         NodeIterator<> end_node;
-        tree_info info =
-            accumulate(NodeIterator<>(root_node), end_node, tree_info{0, 0, 0},
-                       [](tree_info &prev, const Node &node) {
-                           if (node.isBuffer()) {
-                               const auto &buf_node =
-                                   static_cast<const BufferNode<T> &>(node);
-                               // getBytes returns the size of the data Array.
-                               // Sub arrays will be represented by their parent
-                               // size.
-                               prev.total_buffer_size += buf_node.getBytes();
-                               prev.num_buffers++;
-                           } else {
-                               prev.param_scalar_size += node.getParamBytes();
-                           }
-                           return prev;
-                       });
+        tree_info info = tree_info{0, 0, 0};
+
+        for (Node *n : root_nodes) {
+            info = accumulate(
+                NodeIterator<>(n), end_node, info,
+                [](tree_info &prev, const Node &node) {
+                    if (node.isBuffer()) {
+                        const auto &buf_node =
+                            static_cast<const BufferNode<T> &>(node);
+                        // getBytes returns the size of the data Array.
+                        // Sub arrays will be represented by their
+                        // parent size.
+                        prev.total_buffer_size += buf_node.getBytes();
+                        prev.num_buffers++;
+                    } else {
+                        prev.param_scalar_size += node.getParamBytes();
+                    }
+                    return prev;
+                });
+        }
         size_t param_size =
             info.num_buffers * sizeof(Param<T>) + info.param_scalar_size;
 
@@ -297,9 +335,14 @@ kJITHeuristics passesJitHeuristics(Node *root_node) {
         // should be checking the amount of memory available to guard
         // this eval
         if (param_size >= max_param_size) {
+            AF_TRACE(
+                "JIT tree evaluated because of kernel parameter size: {} >= {}",
+                param_size, max_param_size);
             return kJITHeuristics::KernelParameterSize;
         }
         if (jitTreeExceedsMemoryPressure(info.total_buffer_size)) {
+            AF_TRACE("JIT tree evaluated because of memory pressure: {}",
+                     info.total_buffer_size);
             return kJITHeuristics::MemoryPressure;
         }
     }
@@ -322,11 +365,10 @@ Array<T> createHostDataArray(const dim4 &dims, const T *const data) {
 }
 
 template<typename T>
-Array<T> createDeviceDataArray(const dim4 &dims, void *data) {
+Array<T> createDeviceDataArray(const dim4 &dims, void *data, bool copy) {
     verifyTypeSupport<T>();
-    bool is_device   = true;
-    bool copy_device = false;
-    return Array<T>(dims, static_cast<T *>(data), is_device, copy_device);
+    bool is_device = true;
+    return Array<T>(dims, static_cast<T *>(data), is_device, copy);
 }
 
 template<typename T>
@@ -392,7 +434,7 @@ void writeHostDataArray(Array<T> &arr, const T *const data,
     T *ptr = arr.get();
 
     CUDA_CHECK(cudaMemcpyAsync(ptr, data, bytes, cudaMemcpyHostToDevice,
-                               cuda::getActiveStream()));
+                               getActiveStream()));
     CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
 }
 
@@ -404,7 +446,7 @@ void writeDeviceDataArray(Array<T> &arr, const void *const data,
     T *ptr = arr.get();
 
     CUDA_CHECK(cudaMemcpyAsync(ptr, data, bytes, cudaMemcpyDeviceToDevice,
-                               cuda::getActiveStream()));
+                               getActiveStream()));
 }
 
 template<typename T>
@@ -416,7 +458,8 @@ void Array<T>::setDataDims(const dim4 &new_dims) {
 #define INSTANTIATE(T)                                                        \
     template Array<T> createHostDataArray<T>(const dim4 &size,                \
                                              const T *const data);            \
-    template Array<T> createDeviceDataArray<T>(const dim4 &size, void *data); \
+    template Array<T> createDeviceDataArray<T>(const dim4 &size, void *data,  \
+                                               bool copy);                    \
     template Array<T> createValueArray<T>(const dim4 &size, const T &value);  \
     template Array<T> createEmptyArray<T>(const dim4 &size);                  \
     template Array<T> createParamArray<T>(Param<T> & tmp, bool owner);        \
@@ -440,8 +483,9 @@ void Array<T>::setDataDims(const dim4 &new_dims) {
     template void writeDeviceDataArray<T>(                                    \
         Array<T> & arr, const void *const data, const size_t bytes);          \
     template void evalMultiple<T>(std::vector<Array<T> *> arrays);            \
-    template kJITHeuristics passesJitHeuristics<T>(Node * n);                 \
-    template void Array<T>::setDataDims(const dim4 &new_dims);
+    template kJITHeuristics passesJitHeuristics<T>(span<Node *> n);           \
+    template void Array<T>::setDataDims(const dim4 &new_dims);                \
+    template void checkAndMigrate<T>(Array<T> & arr);
 
 INSTANTIATE(float)
 INSTANTIATE(double)
@@ -449,6 +493,7 @@ INSTANTIATE(cfloat)
 INSTANTIATE(cdouble)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(intl)
@@ -458,3 +503,4 @@ INSTANTIATE(ushort)
 INSTANTIATE(half)
 
 }  // namespace cuda
+}  // namespace arrayfire

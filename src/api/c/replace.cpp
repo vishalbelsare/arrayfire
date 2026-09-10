@@ -22,10 +22,12 @@
 #include <select.hpp>
 
 using af::dim4;
-using common::half;
+using arrayfire::getCopyOnWriteArray;
+using arrayfire::common::half;
 using detail::cdouble;
 using detail::cfloat;
 using detail::intl;
+using detail::schar;
 using detail::select_scalar;
 using detail::uchar;
 using detail::uint;
@@ -73,6 +75,7 @@ af_err af_replace(af_array a, const af_array cond, const af_array b) {
             case u64: replace<uintl>(a, cond, b); break;
             case s16: replace<short>(a, cond, b); break;
             case u16: replace<ushort>(a, cond, b); break;
+            case s8: replace<schar>(a, cond, b); break;
             case u8: replace<uchar>(a, cond, b); break;
             case b8: replace<char>(a, cond, b); break;
             default: TYPE_ERROR(2, ainfo.getType());
@@ -82,13 +85,15 @@ af_err af_replace(af_array a, const af_array cond, const af_array b) {
     return AF_SUCCESS;
 }
 
-template<typename T>
-void replace_scalar(af_array a, const af_array cond, const double b) {
-    select_scalar<T, false>(getCopyOnWriteArray<T>(a), getArray<char>(cond),
-                            getArray<T>(a), b);
+template<typename ArrayType, typename ScalarType>
+void replace_scalar(af_array a, const af_array cond, const ScalarType& b) {
+    select_scalar<ArrayType, false>(
+        getCopyOnWriteArray<ArrayType>(a), getArray<char>(cond),
+        getArray<ArrayType>(a), detail::scalar<ArrayType>(b));
 }
 
-af_err af_replace_scalar(af_array a, const af_array cond, const double b) {
+template<typename ScalarType>
+af_err replaceScalar(af_array a, const af_array cond, const ScalarType b) {
     try {
         const ArrayInfo& ainfo = getInfo(a);
         const ArrayInfo& cinfo = getInfo(cond);
@@ -113,6 +118,7 @@ af_err af_replace_scalar(af_array a, const af_array cond, const double b) {
             case u64: replace_scalar<uintl>(a, cond, b); break;
             case s16: replace_scalar<short>(a, cond, b); break;
             case u16: replace_scalar<ushort>(a, cond, b); break;
+            case s8: replace_scalar<schar>(a, cond, b); break;
             case u8: replace_scalar<uchar>(a, cond, b); break;
             case b8: replace_scalar<char>(a, cond, b); break;
             default: TYPE_ERROR(2, ainfo.getType());
@@ -120,4 +126,18 @@ af_err af_replace_scalar(af_array a, const af_array cond, const double b) {
     }
     CATCHALL;
     return AF_SUCCESS;
+}
+
+af_err af_replace_scalar(af_array a, const af_array cond, const double b) {
+    return replaceScalar(a, cond, b);
+}
+
+af_err af_replace_scalar_long(af_array a, const af_array cond,
+                              const long long b) {
+    return replaceScalar(a, cond, b);
+}
+
+af_err af_replace_scalar_ulong(af_array a, const af_array cond,
+                               const unsigned long long b) {
+    return replaceScalar(a, cond, b);
 }

@@ -31,10 +31,10 @@ using std::vector;
 template<typename T>
 class Diagonal : public ::testing::Test {};
 
-typedef ::testing::Types<float, double, int, uint, char, unsigned char,
-                         half_float::half>
+typedef ::testing::Types<float, double, int, uint, char, signed char,
+                         unsigned char, half_float::half>
     TestTypes;
-TYPED_TEST_CASE(Diagonal, TestTypes);
+TYPED_TEST_SUITE(Diagonal, TestTypes);
 
 TYPED_TEST(Diagonal, Create) {
     SUPPORTED_TYPE_CHECK(TypeParam);

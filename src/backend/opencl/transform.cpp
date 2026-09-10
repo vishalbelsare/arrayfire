@@ -9,26 +9,35 @@
 
 #include <transform.hpp>
 
+#include <copy.hpp>
 #include <kernel/transform.hpp>
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T>
 void transform(Array<T> &out, const Array<T> &in, const Array<float> &tf,
                const af_interp_type method, const bool inverse,
                const bool perspective) {
+    // TODO: Temporary Fix, must fix handling subarrays upstream
+    // tf has to be linear, although offset is allowed.
+    const Array<float> tf_Lin = tf.isLinear() ? tf : copyArray(tf);
+
     switch (method) {
         case AF_INTERP_NEAREST:
         case AF_INTERP_LOWER:
-            kernel::transform<T>(out, in, tf, inverse, perspective, method, 1);
+            kernel::transform<T>(out, in, tf_Lin, inverse, perspective, method,
+                                 1);
             break;
         case AF_INTERP_BILINEAR:
         case AF_INTERP_BILINEAR_COSINE:
-            kernel::transform<T>(out, in, tf, inverse, perspective, method, 2);
+            kernel::transform<T>(out, in, tf_Lin, inverse, perspective, method,
+                                 2);
             break;
         case AF_INTERP_BICUBIC:
         case AF_INTERP_BICUBIC_SPLINE:
-            kernel::transform<T>(out, in, tf, inverse, perspective, method, 3);
+            kernel::transform<T>(out, in, tf_Lin, inverse, perspective, method,
+                                 3);
             break;
         default: AF_ERROR("Unsupported interpolation type", AF_ERR_ARG);
     }
@@ -48,9 +57,11 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 
 }  // namespace opencl
+}  // namespace arrayfire

@@ -20,6 +20,7 @@ size_t size_of(af_dtype type) {
             case f64: return sizeof(double);
             case s32: return sizeof(int);
             case u32: return sizeof(unsigned);
+            case s8: return sizeof(signed char);
             case u8: return sizeof(unsigned char);
             case b8: return sizeof(unsigned char);
             case c32: return sizeof(float) * 2;
@@ -38,6 +39,9 @@ size_t size_of(af_dtype type) {
 }
 
 af_err af_get_size_of(size_t *size, af_dtype type) {
-    *size = size_of(type);
-    return AF_SUCCESS;
+    try {
+        *size = size_of(type);
+        return AF_SUCCESS;
+    }
+    CATCHALL;
 }

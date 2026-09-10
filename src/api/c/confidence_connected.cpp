@@ -24,11 +24,14 @@
 #include <type_traits>
 
 using af::dim4;
-using common::cast;
-using common::createSpanIndex;
+using arrayfire::common::cast;
+using arrayfire::common::convRange;
+using arrayfire::common::createSpanIndex;
+using arrayfire::common::integralImage;
 using detail::arithOp;
 using detail::Array;
 using detail::createValueArray;
+using detail::getScalar;
 using detail::reduce_all;
 using detail::uchar;
 using detail::uint;
@@ -42,8 +45,15 @@ using std::swap;
 template<typename T>
 Array<T> pointList(const Array<T>& in, const Array<uint>& x,
                    const Array<uint>& y) {
-    af_array xcoords                          = getHandle<uint>(x);
-    af_array ycoords                          = getHandle<uint>(y);
+
+    // TODO: Temporary Fix, must fix handling subarrays upstream
+    // Array<T> has to be a basic array, to be accepted as af_index
+    Array<uint> x_ = (x.getOffset() == 0 && x.isLinear()) ? x : copyArray(x);
+    Array<uint> y_ = (y.getOffset() == 0 && y.isLinear()) ? y : copyArray(y);
+
+    af_array xcoords = getHandle<uint>(x_);
+    af_array ycoords = getHandle<uint>(y_);
+
     std::array<af_index_t, AF_MAX_DIMS> idxrs = {{{{xcoords}, false, false},
                                                   {{ycoords}, false, false},
                                                   createSpanIndex(),
@@ -121,14 +131,14 @@ af_array ccHelper(const Array<T>& img, const Array<uint>& seedx,
     Array<uint> x_     = arithOp<uint, af_add_t>(seedx, radii, seedDims);
     Array<uint> _y     = arithOp<uint, af_sub_t>(seedy, radiip, seedDims);
     Array<uint> y_     = arithOp<uint, af_add_t>(seedy, radii, seedDims);
-    Array<CT> in       = common::convRange<CT, T>(img, CT(1), CT(2));
+    Array<CT> in       = convRange<CT, T>(img, CT(1), CT(2));
     Array<CT> in_2     = arithOp<CT, af_mul_t>(in, in, inDims);
-    Array<CT> I1       = common::integralImage<CT>(in);
-    Array<CT> I2       = common::integralImage<CT>(in_2);
+    Array<CT> I1       = integralImage<CT>(in);
+    Array<CT> I2       = integralImage<CT>(in_2);
     Array<CT> S1       = sum(I1, _x, x_, _y, y_);
     Array<CT> S2       = sum(I2, _x, x_, _y, y_);
-    CT totSum          = reduce_all<af_add_t, CT, CT>(S1);
-    CT totSumSq        = reduce_all<af_add_t, CT, CT>(S2);
+    CT totSum          = getScalar<CT>(reduce_all<af_add_t, CT, CT>(S1));
+    CT totSumSq        = getScalar<CT>(reduce_all<af_add_t, CT, CT>(S2));
     CT totalNum        = numSeeds * nhoodSize;
     CT s1mean          = totSum / totalNum;
     CT s1var           = calcVar(totSumSq, totSum, totalNum);
@@ -137,8 +147,10 @@ af_array ccHelper(const Array<T>& img, const Array<uint>& seedx,
     CT upper           = s1mean + mult * s1stddev;
 
     Array<CT> seedIntensities = pointList(in, seedx, seedy);
-    CT maxSeedIntensity       = reduce_all<af_max_t, CT, CT>(seedIntensities);
-    CT minSeedIntensity       = reduce_all<af_min_t, CT, CT>(seedIntensities);
+    CT maxSeedIntensity =
+        getScalar<CT>(reduce_all<af_max_t, CT, CT>(seedIntensities));
+    CT minSeedIntensity =
+        getScalar<CT>(reduce_all<af_min_t, CT, CT>(seedIntensities));
 
     if (lower > minSeedIntensity) { lower = minSeedIntensity; }
     if (upper < maxSeedIntensity) { upper = maxSeedIntensity; }
@@ -155,7 +167,8 @@ af_array ccHelper(const Array<T>& img, const Array<uint>& seedx,
         // Segmented images are set with 1's and 0's thus essentially
         // making them into mask arrays for each iteration's input image
 
-        uint sampleCount = reduce_all<af_notzero_t, CT, uint>(segmented, true);
+        uint sampleCount = getScalar<uint>(
+            reduce_all<af_notzero_t, CT, uint>(segmented, true));
         if (sampleCount == 0) {
             // If no valid pixels are found, skip iterations
             break;
@@ -163,8 +176,9 @@ af_array ccHelper(const Array<T>& img, const Array<uint>& seedx,
         Array<CT> valids = arithOp<CT, af_mul_t>(segmented, in, inDims);
         Array<CT> vsqrd  = arithOp<CT, af_mul_t>(valids, valids, inDims);
 
-        CT validsSum  = reduce_all<af_add_t, CT, CT>(valids, true);
-        CT sumOfSqs   = reduce_all<af_add_t, CT, CT>(vsqrd, true);
+        CT validsSum =
+            getScalar<CT>(reduce_all<af_add_t, CT, CT>(valids, true));
+        CT sumOfSqs = getScalar<CT>(reduce_all<af_add_t, CT, CT>(vsqrd, true));
         CT validsMean = validsSum / sampleCount;
         CT validsVar  = calcVar(sumOfSqs, validsSum, CT(sampleCount));
         CT stddev     = sqrt(validsVar);

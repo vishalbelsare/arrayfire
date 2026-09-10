@@ -32,8 +32,8 @@ void uniqueTest(string pTestFile) {
 
     vector<dim4> numDims;
 
-    vector<vector<int> > data;
-    vector<vector<int> > tests;
+    vector<vector<int>> data;
+    vector<vector<int>> tests;
     readTests<int, int, int>(pTestFile, numDims, data, tests);
 
     // Compare result
@@ -77,6 +77,7 @@ UNIQUE_TESTS(float)
 UNIQUE_TESTS(double)
 UNIQUE_TESTS(int)
 UNIQUE_TESTS(uint)
+UNIQUE_TESTS(schar)
 UNIQUE_TESTS(uchar)
 UNIQUE_TESTS(short)
 UNIQUE_TESTS(ushort)
@@ -92,8 +93,8 @@ void setTest(string pTestFile) {
 
     vector<dim4> numDims;
 
-    vector<vector<int> > data;
-    vector<vector<int> > tests;
+    vector<vector<int>> data;
+    vector<vector<int>> tests;
     readTests<int, int, int>(pTestFile, numDims, data, tests);
 
     // Compare result
@@ -149,6 +150,7 @@ SET_TESTS(float)
 SET_TESTS(double)
 SET_TESTS(int)
 SET_TESTS(uint)
+SET_TESTS(schar)
 SET_TESTS(uchar)
 SET_TESTS(short)
 SET_TESTS(ushort)

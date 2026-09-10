@@ -14,6 +14,7 @@
 #include <queue.hpp>
 #include <resize.hpp>
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
@@ -52,9 +53,11 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 
 }  // namespace cpu
+}  // namespace arrayfire

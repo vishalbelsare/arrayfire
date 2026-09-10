@@ -15,13 +15,17 @@
 #include <vector_field.hpp>
 
 using af::dim4;
+using arrayfire::common::ForgeManager;
+using arrayfire::common::ForgeModule;
+using arrayfire::common::forgePlugin;
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
 void copy_vector_field(const Array<T> &points, const Array<T> &directions,
                        fg_vector_field vfield) {
-    ForgeModule &_ = graphics::forgePlugin();
+    ForgeModule &_ = forgePlugin();
     points.eval();
     directions.eval();
     getQueue().sync();
@@ -54,8 +58,10 @@ INSTANTIATE(float)
 INSTANTIATE(double)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 
 }  // namespace cpu
+}  // namespace arrayfire

@@ -14,6 +14,7 @@
 #include <af/dim4.hpp>
 #include <complex>
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<uint> where(const Array<T> &in) {
@@ -34,8 +35,10 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 
 }  // namespace opencl
+}  // namespace arrayfire

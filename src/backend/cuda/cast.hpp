@@ -16,8 +16,8 @@
 #include <optypes.hpp>
 #include <types.hpp>
 #include <af/dim4.hpp>
-#include <complex>
 
+namespace arrayfire {
 namespace cuda {
 
 template<typename To, typename Ti>
@@ -34,6 +34,7 @@ struct CastOp {
 CAST_FN(int)
 CAST_FN(unsigned int)
 CAST_FN(unsigned char)
+CAST_FN(signed char)
 CAST_FN(unsigned short)
 CAST_FN(short)
 CAST_FN(float)
@@ -85,3 +86,4 @@ struct CastOp<unsigned char, common::half> {
 #undef CAST_CFN
 
 }  // namespace cuda
+}  // namespace arrayfire

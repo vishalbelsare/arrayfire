@@ -10,8 +10,9 @@
 #include <common/half.hpp>
 #include "reduce_impl.hpp"
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 // min
 INSTANTIATE(af_min_t, float, float)
@@ -23,8 +24,10 @@ INSTANTIATE(af_min_t, uint, uint)
 INSTANTIATE(af_min_t, intl, intl)
 INSTANTIATE(af_min_t, uintl, uintl)
 INSTANTIATE(af_min_t, char, char)
+INSTANTIATE(af_min_t, schar, schar)
 INSTANTIATE(af_min_t, uchar, uchar)
 INSTANTIATE(af_min_t, short, short)
 INSTANTIATE(af_min_t, ushort, ushort)
 INSTANTIATE(af_min_t, half, half)
 }  // namespace opencl
+}  // namespace arrayfire

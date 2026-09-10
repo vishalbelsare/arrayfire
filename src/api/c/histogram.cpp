@@ -15,6 +15,7 @@
 #include <af/image.h>
 
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -74,13 +75,17 @@ af_err af_histogram(af_array *out, const af_array in, const unsigned nbins,
                 output = histogram<uintl>(in, nbins, minval, maxval,
                                           info.isLinear());
                 break;
+            case s8:
+                output = histogram<schar>(in, nbins, minval, maxval,
+                                          info.isLinear());
+                break;
             case u8:
                 output = histogram<uchar>(in, nbins, minval, maxval,
                                           info.isLinear());
                 break;
             case f16:
-                output = histogram<common::half>(in, nbins, minval, maxval,
-                                                 info.isLinear());
+                output = histogram<arrayfire::common::half>(
+                    in, nbins, minval, maxval, info.isLinear());
                 break;
             default: TYPE_ERROR(1, type);
         }

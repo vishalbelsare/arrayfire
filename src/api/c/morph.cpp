@@ -24,8 +24,8 @@
 #include <af/image.h>
 
 using af::dim4;
-using common::cast;
-using common::flip;
+using arrayfire::common::cast;
+using arrayfire::common::flip;
 using detail::arithOp;
 using detail::Array;
 using detail::cdouble;
@@ -34,6 +34,7 @@ using detail::createEmptyArray;
 using detail::createValueArray;
 using detail::logicOp;
 using detail::scalar;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::unaryOp;
@@ -61,6 +62,8 @@ af_array morph<char>(const af_array &input, const af_array &mask,
 #elif defined(AF_CUDA)
     constexpr unsigned fftMethodThreshold = 17;
 #elif defined(AF_OPENCL)
+    constexpr unsigned fftMethodThreshold = 19;
+#elif defined(AF_ONEAPI)
     constexpr unsigned fftMethodThreshold = 19;
 #endif  // defined(AF_CPU)
 
@@ -135,6 +138,7 @@ af_err morph(af_array *out, const af_array &in, const af_array &mask,
             case u32: output = morph<uint>(in, mask, isDilation); break;
             case s16: output = morph<short>(in, mask, isDilation); break;
             case u16: output = morph<ushort>(in, mask, isDilation); break;
+            case s8: output = morph<schar>(in, mask, isDilation); break;
             case u8: output = morph<uchar>(in, mask, isDilation); break;
             default: TYPE_ERROR(1, type);
         }
@@ -168,6 +172,7 @@ af_err morph3d(af_array *out, const af_array &in, const af_array &mask,
             case u32: output = morph3d<uint>(in, mask, isDilation); break;
             case s16: output = morph3d<short>(in, mask, isDilation); break;
             case u16: output = morph3d<ushort>(in, mask, isDilation); break;
+            case s8: output = morph3d<schar>(in, mask, isDilation); break;
             case u8: output = morph3d<uchar>(in, mask, isDilation); break;
             default: TYPE_ERROR(1, type);
         }

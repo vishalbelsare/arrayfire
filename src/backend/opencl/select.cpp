@@ -15,16 +15,18 @@
 #include <err_opencl.hpp>
 #include <scalar.hpp>
 
+#include <nonstd/span.hpp>
 #include <memory>
 
 using af::dim4;
 
-using common::half;
-using common::NaryNode;
+using arrayfire::common::half;
+using arrayfire::common::NaryNode;
 
 using std::make_shared;
 using std::max;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
@@ -40,8 +42,8 @@ Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
     auto node = make_shared<NaryNode>(
         NaryNode(static_cast<af::dtype>(dtype_traits<T>::af_type), "__select",
                  3, {{cond_node, a_node, b_node}}, af_select_t, height));
-
-    if (detail::passesJitHeuristics<T>(node.get()) != kJITHeuristics::Pass) {
+    std::array<common::Node *, 1> nodes{node.get()};
+    if (detail::passesJitHeuristics<T>(nodes) != kJITHeuristics::Pass) {
         if (a_height > max(b_height, cond_height)) {
             a.eval();
         } else if (b_height > cond_height) {
@@ -56,10 +58,10 @@ Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
 
 template<typename T, bool flip>
 Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
-                          const double &b_val, const dim4 &odims) {
+                          const T &b_val, const dim4 &odims) {
     auto cond_node   = cond.getNode();
     auto a_node      = a.getNode();
-    Array<T> b       = createScalarNode<T>(odims, scalar<T>(b_val));
+    Array<T> b       = createScalarNode<T>(odims, b_val);
     auto b_node      = b.getNode();
     auto a_height    = a_node->getHeight();
     auto b_height    = b_node->getHeight();
@@ -71,7 +73,8 @@ Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
         (flip ? "__not_select" : "__select"), 3, {{cond_node, a_node, b_node}},
         (flip ? af_not_select_t : af_select_t), height));
 
-    if (detail::passesJitHeuristics<T>(node.get()) != kJITHeuristics::Pass) {
+    std::array<common::Node *, 1> nodes{node.get()};
+    if (detail::passesJitHeuristics<T>(nodes) != kJITHeuristics::Pass) {
         if (a_height > max(b_height, cond_height)) {
             a.eval();
         } else if (b_height > cond_height) {
@@ -92,28 +95,28 @@ void select(Array<T> &out, const Array<char> &cond, const Array<T> &a,
 
 template<typename T, bool flip>
 void select_scalar(Array<T> &out, const Array<char> &cond, const Array<T> &a,
-                   const double &b) {
+                   const T &b) {
     kernel::select_scalar<T>(out, cond, a, b, out.ndims(), flip);
 }
 
-#define INSTANTIATE(T)                                                        \
-    template Array<T> createSelectNode<T>(                                    \
-        const Array<char> &cond, const Array<T> &a, const Array<T> &b,        \
-        const af::dim4 &odims);                                               \
-    template Array<T> createSelectNode<T, true>(                              \
-        const Array<char> &cond, const Array<T> &a, const double &b_val,      \
-        const af::dim4 &odims);                                               \
-    template Array<T> createSelectNode<T, false>(                             \
-        const Array<char> &cond, const Array<T> &a, const double &b_val,      \
-        const af::dim4 &odims);                                               \
-    template void select<T>(Array<T> & out, const Array<char> &cond,          \
-                            const Array<T> &a, const Array<T> &b);            \
-    template void select_scalar<T, true>(Array<T> & out,                      \
-                                         const Array<char> &cond,             \
-                                         const Array<T> &a, const double &b); \
-    template void select_scalar<T, false>(Array<T> & out,                     \
-                                          const Array<char> &cond,            \
-                                          const Array<T> &a, const double &b)
+#define INSTANTIATE(T)                                                   \
+    template Array<T> createSelectNode<T>(                               \
+        const Array<char> &cond, const Array<T> &a, const Array<T> &b,   \
+        const af::dim4 &odims);                                          \
+    template Array<T> createSelectNode<T, true>(                         \
+        const Array<char> &cond, const Array<T> &a, const T &b_val,      \
+        const af::dim4 &odims);                                          \
+    template Array<T> createSelectNode<T, false>(                        \
+        const Array<char> &cond, const Array<T> &a, const T &b_val,      \
+        const af::dim4 &odims);                                          \
+    template void select<T>(Array<T> & out, const Array<char> &cond,     \
+                            const Array<T> &a, const Array<T> &b);       \
+    template void select_scalar<T, true>(Array<T> & out,                 \
+                                         const Array<char> &cond,        \
+                                         const Array<T> &a, const T &b); \
+    template void select_scalar<T, false>(Array<T> & out,                \
+                                          const Array<char> &cond,       \
+                                          const Array<T> &a, const T &b)
 
 INSTANTIATE(float);
 INSTANTIATE(double);
@@ -124,6 +127,7 @@ INSTANTIATE(uint);
 INSTANTIATE(intl);
 INSTANTIATE(uintl);
 INSTANTIATE(char);
+INSTANTIATE(schar);
 INSTANTIATE(uchar);
 INSTANTIATE(short);
 INSTANTIATE(ushort);
@@ -131,3 +135,4 @@ INSTANTIATE(half);
 
 #undef INSTANTIATE
 }  // namespace opencl
+}  // namespace arrayfire

@@ -15,7 +15,7 @@
 #include <copy.hpp>
 #include <lapack_helper.hpp>
 #include <math.hpp>
-#if INTEL_MKL_VERSION >= 20210004
+#if USE_MKL
 #include <mkl_version.h>
 #endif
 #include <queue.hpp>
@@ -26,6 +26,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
@@ -322,9 +323,11 @@ Array<T> solve(const Array<T> &a, const Array<T> &b,
 }
 
 }  // namespace cpu
+}  // namespace arrayfire
 
 #else  // WITH_LINEAR_ALGEBRA
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
@@ -344,9 +347,11 @@ Array<T> solve(const Array<T> &a, const Array<T> &b,
 }
 
 }  // namespace cpu
+}  // namespace arrayfire
 
 #endif  // WITH_LINEAR_ALGEBRA
 
+namespace arrayfire {
 namespace cpu {
 
 #define INSTANTIATE_SOLVE(T)                                                 \
@@ -362,3 +367,4 @@ INSTANTIATE_SOLVE(double)
 INSTANTIATE_SOLVE(cdouble)
 
 }  // namespace cpu
+}  // namespace arrayfire

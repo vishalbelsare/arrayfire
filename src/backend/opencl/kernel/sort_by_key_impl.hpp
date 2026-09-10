@@ -36,7 +36,7 @@ AF_DEPRECATED_WARNINGS_ON
 
 namespace compute = boost::compute;
 
-using common::half;
+using arrayfire::common::half;
 
 template<typename Tk, typename Tv, bool isAscending>
 inline boost::compute::function<bool(const std::pair<Tk, Tv>,
@@ -79,6 +79,7 @@ INSTANTIATE_FLIP(cl_ulong, ULONG_MAX)
 
 #undef INSTANTIATE_FLIP
 
+namespace arrayfire {
 namespace opencl {
 namespace kernel {
 static const int copyPairIter = 4;
@@ -222,10 +223,11 @@ void sort0ByKey(Param pKey, Param pVal, bool isAscending) {
     // But this is only useful before GPU is saturated
     // The GPU is saturated at around 1000,000 integers
     // Call batched sort only if both conditions are met
-    if (higherDims > 4 && pKey.info.dims[0] < 1000000)
+    if (higherDims > 4 && pKey.info.dims[0] < 1000000) {
         kernel::sortByKeyBatched<Tk, Tv>(pKey, pVal, 0, isAscending);
-    else
+    } else {
         kernel::sort0ByKeyIterative<Tk, Tv>(pKey, pVal, isAscending);
+    }
 }
 
 #define INSTANTIATE(Tk, Tv)                                           \
@@ -246,6 +248,7 @@ void sort0ByKey(Param pKey, Param pVal, bool isAscending) {
     INSTANTIATE(Tk, short)   \
     INSTANTIATE(Tk, ushort)  \
     INSTANTIATE(Tk, char)    \
+    INSTANTIATE(Tk, schar)   \
     INSTANTIATE(Tk, uchar)   \
     INSTANTIATE(Tk, intl)    \
     INSTANTIATE(Tk, uintl)   \
@@ -253,3 +256,4 @@ void sort0ByKey(Param pKey, Param pVal, bool isAscending) {
 
 }  // namespace kernel
 }  // namespace opencl
+}  // namespace arrayfire

@@ -15,8 +15,12 @@
 #include <mutex>
 #include <utility>
 
+using arrayfire::common::getEnvVar;
 using std::make_pair;
 using std::string;
+
+namespace arrayfire {
+namespace common {
 
 /// Dynamically loads forge function pointer at runtime
 #define FG_MODULE_FUNCTION_INIT(NAME) \
@@ -135,6 +139,7 @@ INSTANTIATE_GET_FG_TYPE(float, FG_FLOAT32);
 INSTANTIATE_GET_FG_TYPE(int, FG_INT32);
 INSTANTIATE_GET_FG_TYPE(unsigned, FG_UINT32);
 INSTANTIATE_GET_FG_TYPE(char, FG_INT8);
+INSTANTIATE_GET_FG_TYPE(signed char, FG_INT8);
 INSTANTIATE_GET_FG_TYPE(unsigned char, FG_UINT8);
 INSTANTIATE_GET_FG_TYPE(unsigned short, FG_UINT16);
 INSTANTIATE_GET_FG_TYPE(short, FG_INT16);
@@ -174,7 +179,7 @@ size_t getTypeSize(GLenum type) {
 }
 
 void makeContextCurrent(fg_window window) {
-    FG_CHECK(graphics::forgePlugin().fg_make_window_current(window));
+    FG_CHECK(common::forgePlugin().fg_make_window_current(window));
     CheckGL("End makeContextCurrent");
 }
 
@@ -182,10 +187,10 @@ void makeContextCurrent(fg_window window) {
 double step_round(const double in, const bool dir) {
     if (in == 0) { return 0; }
 
-    static const double __log2 = log10(2);
-    static const double __log4 = log10(4);
-    static const double __log6 = log10(6);
-    static const double __log8 = log10(8);
+    static const double LOG2 = log10(2);
+    static const double LOG4 = log10(4);
+    static const double LOG6 = log10(6);
+    static const double LOG8 = log10(8);
 
     // log_in is of the form "s abc.xyz", where
     // s is either + or -; + indicates abs(in) >= 1 and - indicates 0 < abs(in)
@@ -206,25 +211,25 @@ double step_round(const double in, const bool dir) {
 
     // Round up
     if (op_dir) {
-        if (dec <= __log2) {
+        if (dec <= LOG2) {
             mult = 2;
-        } else if (dec <= __log4) {
+        } else if (dec <= LOG4) {
             mult = 4;
-        } else if (dec <= __log6) {
+        } else if (dec <= LOG6) {
             mult = 6;
-        } else if (dec <= __log8) {
+        } else if (dec <= LOG8) {
             mult = 8;
         } else {
             mult = 10;
         }
     } else {  // Round down
-        if (dec < __log2) {
+        if (dec < LOG2) {
             mult = 1;
-        } else if (dec < __log4) {
+        } else if (dec < LOG4) {
             mult = 2;
-        } else if (dec < __log6) {
+        } else if (dec < LOG6) {
             mult = 4;
-        } else if (dec < __log8) {
+        } else if (dec < LOG8) {
             mult = 6;
         } else {
             mult = 8;
@@ -233,8 +238,6 @@ double step_round(const double in, const bool dir) {
 
     return mag * mult;
 }
-
-namespace graphics {
 
 ForgeModule& forgePlugin() { return detail::forgeManager().plugin(); }
 
@@ -518,4 +521,6 @@ void ForgeManager::setChartAxesOverride(const fg_chart chart, bool flag) {
     }
     mChartAxesOverrideMap[chart] = flag;
 }
-}  // namespace graphics
+
+}  // namespace common
+}  // namespace arrayfire

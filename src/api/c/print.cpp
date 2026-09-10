@@ -30,10 +30,13 @@
 
 #include <af/index.h>
 
-using common::half;
+using arrayfire::getSparseArray;
+using arrayfire::common::half;
+using arrayfire::common::SparseArray;
 using detail::cdouble;
 using detail::cfloat;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -115,7 +118,7 @@ static void print(const char *exp, af_array arr, const int precision,
 template<typename T>
 static void printSparse(const char *exp, af_array arr, const int precision,
                         std::ostream &os = std::cout, bool transpose = true) {
-    common::SparseArray<T> sparse = getSparseArray<T>(arr);
+    SparseArray<T> sparse = getSparseArray<T>(arr);
     std::string name("No Name Sparse Array");
 
     if (exp != NULL) { name = std::string(exp); }
@@ -160,6 +163,7 @@ af_err af_print_array(af_array arr) {
                 case b8: print<char>(NULL, arr, 4); break;
                 case s32: print<int>(NULL, arr, 4); break;
                 case u32: print<unsigned>(NULL, arr, 4); break;
+                case s8: print<schar>(NULL, arr, 4); break;
                 case u8: print<uchar>(NULL, arr, 4); break;
                 case s64: print<intl>(NULL, arr, 4); break;
                 case u64: print<uintl>(NULL, arr, 4); break;
@@ -199,6 +203,7 @@ af_err af_print_array_gen(const char *exp, const af_array arr,
                 case b8: print<char>(exp, arr, precision); break;
                 case s32: print<int>(exp, arr, precision); break;
                 case u32: print<unsigned>(exp, arr, precision); break;
+                case s8: print<schar>(exp, arr, precision); break;
                 case u8: print<uchar>(exp, arr, precision); break;
                 case s64: print<intl>(exp, arr, precision); break;
                 case u64: print<uintl>(exp, arr, precision); break;
@@ -257,6 +262,9 @@ af_err af_array_to_string(char **output, const char *exp, const af_array arr,
                 case u32:
                     print<unsigned>(exp, arr, precision, ss, transpose);
                     break;
+                case s8:
+                    print<schar>(exp, arr, precision, ss, transpose);
+                    break;
                 case u8:
                     print<uchar>(exp, arr, precision, ss, transpose);
                     break;
@@ -278,9 +286,10 @@ af_err af_array_to_string(char **output, const char *exp, const af_array arr,
                 default: TYPE_ERROR(1, type);
             }
         }
-        std::string str = ss.str();
-        af_alloc_host(reinterpret_cast<void **>(output),
-                      sizeof(char) * (str.size() + 1));
+        std::string str  = ss.str();
+        void *halloc_ptr = nullptr;
+        af_alloc_host(&halloc_ptr, sizeof(char) * (str.size() + 1));
+        memcpy(output, &halloc_ptr, sizeof(void *));
         str.copy(*output, str.size());
         (*output)[str.size()] = '\0';  // don't forget the terminating 0
     }

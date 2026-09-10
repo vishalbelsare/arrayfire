@@ -17,6 +17,7 @@
 #include <reorder.hpp>
 #include <sort_by_key.hpp>
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename Tk, typename Tv>
@@ -70,6 +71,7 @@ void sort_by_key(Array<Tk> &okey, Array<Tv> &oval, const Array<Tk> &ikey,
     INSTANTIATE(Tk, int)     \
     INSTANTIATE(Tk, uint)    \
     INSTANTIATE(Tk, char)    \
+    INSTANTIATE(Tk, schar)   \
     INSTANTIATE(Tk, uchar)   \
     INSTANTIATE(Tk, short)   \
     INSTANTIATE(Tk, ushort)  \
@@ -81,6 +83,7 @@ INSTANTIATE1(double)
 INSTANTIATE1(int)
 INSTANTIATE1(uint)
 INSTANTIATE1(char)
+INSTANTIATE1(schar)
 INSTANTIATE1(uchar)
 INSTANTIATE1(short)
 INSTANTIATE1(ushort)
@@ -88,3 +91,4 @@ INSTANTIATE1(intl)
 INSTANTIATE1(uintl)
 
 }  // namespace cpu
+}  // namespace arrayfire

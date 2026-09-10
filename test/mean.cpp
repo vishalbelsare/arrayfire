@@ -40,11 +40,11 @@ class Mean : public ::testing::Test {
 // This list does not allow to cleanly add the af_half/half_float type : at the
 // moment half tested in some special unittests
 typedef ::testing::Types<cdouble, cfloat, float, double, int, uint, intl, uintl,
-                         char, uchar, short, ushort, half_float::half>
+                         char, schar, uchar, short, ushort, half_float::half>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Mean, TestTypes);
+TYPED_TEST_SUITE(Mean, TestTypes);
 
 template<typename T>
 struct f32HelperType {
@@ -70,9 +70,9 @@ template<typename T>
 struct meanOutType {
     typedef typename cond_type<
         is_same_type<T, float>::value || is_same_type<T, int>::value ||
-            is_same_type<T, uint>::value || is_same_type<T, uchar>::value ||
-            is_same_type<T, short>::value || is_same_type<T, ushort>::value ||
-            is_same_type<T, char>::value,
+            is_same_type<T, uint>::value || is_same_type<T, schar>::value ||
+            is_same_type<T, uchar>::value || is_same_type<T, short>::value ||
+            is_same_type<T, ushort>::value || is_same_type<T, char>::value,
         float, typename elseType<T>::type>::type type;
 };
 
@@ -85,8 +85,8 @@ void meanDimTest(string pFileName, dim_t dim, bool isWeighted = false) {
     double tol = 1.0e-3;
     if ((af_dtype)af::dtype_traits<T>::af_type == f16) tol = 4.e-3;
     vector<dim4> numDims;
-    vector<vector<int> > in;
-    vector<vector<float> > tests;
+    vector<vector<int>> in;
+    vector<vector<float>> tests;
 
     readTestsFromFile<int, float>(pFileName, numDims, in, tests);
 
@@ -228,7 +228,7 @@ TEST(MeanAll, s32) { meanAllTest<int>(2, dim4(5, 5, 2, 2)); }
 
 TEST(MeanAll, u32) { meanAllTest<unsigned>(2, dim4(100, 1, 1, 1)); }
 
-TEST(MeanAll, s8) { meanAllTest<char>(2, dim4(5, 5, 2, 2)); }
+TEST(MeanAll, s8) { meanAllTest<schar>(2, dim4(5, 5, 2, 2)); }
 
 TEST(MeanAll, u8) { meanAllTest<uchar>(2, dim4(100, 1, 1, 1)); }
 
@@ -270,7 +270,7 @@ class WeightedMean : public ::testing::Test {
 };
 
 // register the type list
-TYPED_TEST_CASE(WeightedMean, TestTypes);
+TYPED_TEST_SUITE(WeightedMean, TestTypes);
 
 template<typename T, typename wtsType>
 void weightedMeanAllTest(dim4 dims) {
@@ -362,8 +362,9 @@ TEST(MeanAll, SubArray) {
     array in  = randu(inDims);
     array sub = in(0, span, span, span);
 
-    size_t nElems = sub.elements();
-    ASSERT_FLOAT_EQ(mean<float>(sub), sum<float>(sub) / nElems);
+    size_t nElems   = sub.elements();
+    float max_error = std::numeric_limits<float>::epsilon() * nElems;
+    ASSERT_NEAR(mean<float>(sub), sum<float>(sub) / nElems, max_error);
 }
 
 TEST(MeanHalf, dim0) {

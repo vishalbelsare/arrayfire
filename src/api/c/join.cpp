@@ -14,14 +14,19 @@
 #include <handle.hpp>
 #include <join.hpp>
 #include <af/data.h>
+
+#include <algorithm>
+#include <climits>
 #include <vector>
 
 using af::dim4;
-using common::half;
+using arrayfire::common::half;
 using detail::Array;
 using detail::cdouble;
 using detail::cfloat;
+using detail::createEmptyArray;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -41,33 +46,43 @@ static inline af_array join_many(const int dim, const unsigned n_arrays,
     vector<Array<T>> inputs_;
     inputs_.reserve(n_arrays);
 
-    for (unsigned i = 0; i < n_arrays; i++) {
-        inputs_.push_back(getArray<T>(inputs[i]));
+    dim_t dim_size{0};
+    for (unsigned i{0}; i < n_arrays; ++i) {
+        const Array<T> &iArray = getArray<T>(inputs[i]);
+        if (!iArray.isEmpty()) {
+            inputs_.push_back(iArray);
+            dim_size += iArray.dims().dims[dim];
+        }
     }
-    return getHandle(join<T>(dim, inputs_));
+
+    // All dimensions except join dimension must be equal
+    // calculate odims size
+    af::dim4 odims{inputs_[0].dims()};
+    odims.dims[dim] = dim_size;
+
+    Array<T> out{createEmptyArray<T>(odims)};
+    join<T>(out, dim, inputs_);
+    return getHandle(out);
 }
 
 af_err af_join(af_array *out, const int dim, const af_array first,
                const af_array second) {
     try {
-        const ArrayInfo &finfo = getInfo(first);
-        const ArrayInfo &sinfo = getInfo(second);
-        dim4 fdims             = finfo.dims();
-        dim4 sdims             = sinfo.dims();
+        const ArrayInfo &finfo{getInfo(first)};
+        const ArrayInfo &sinfo{getInfo(second)};
+        const dim4 &fdims{finfo.dims()};
+        const dim4 &sdims{sinfo.dims()};
 
         ARG_ASSERT(1, dim >= 0 && dim < 4);
         ARG_ASSERT(2, finfo.getType() == sinfo.getType());
         if (sinfo.elements() == 0) { return af_retain_array(out, first); }
-
         if (finfo.elements() == 0) { return af_retain_array(out, second); }
-
-        DIM_ASSERT(2, sinfo.elements() > 0);
-        DIM_ASSERT(3, finfo.elements() > 0);
+        DIM_ASSERT(2, finfo.elements() > 0);
+        DIM_ASSERT(3, sinfo.elements() > 0);
 
         // All dimensions except join dimension must be equal
-        // Compute output dims
-        for (int i = 0; i < 4; i++) {
-            if (i != dim) { DIM_ASSERT(2, fdims[i] == sdims[i]); }
+        for (int i{0}; i < AF_MAX_DIMS; i++) {
+            if (i != dim) { DIM_ASSERT(2, fdims.dims[i] == sdims.dims[i]); }
         }
 
         af_array output;
@@ -84,6 +99,7 @@ af_err af_join(af_array *out, const int dim, const af_array first,
             case u64: output = join<uintl>(dim, first, second); break;
             case s16: output = join<short>(dim, first, second); break;
             case u16: output = join<ushort>(dim, first, second); break;
+            case s8: output = join<schar>(dim, first, second); break;
             case u8: output = join<uchar>(dim, first, second); break;
             case f16: output = join<half>(dim, first, second); break;
             default: TYPE_ERROR(1, finfo.getType());
@@ -101,40 +117,49 @@ af_err af_join_many(af_array *out, const int dim, const unsigned n_arrays,
         ARG_ASSERT(3, inputs != nullptr);
 
         if (n_arrays == 1) {
-            af_array ret = nullptr;
-            AF_CHECK(af_retain_array(&ret, inputs[0]));
+            af_array ret{nullptr};
+            AF_CHECK(af_retain_array(&ret, *inputs));
             std::swap(*out, ret);
             return AF_SUCCESS;
         }
 
-        vector<ArrayInfo> info;
-        info.reserve(n_arrays);
-        vector<af::dim4> dims(n_arrays);
-        for (unsigned i = 0; i < n_arrays; i++) {
-            info.push_back(getInfo(inputs[i]));
-            dims[i] = info[i].dims();
+        ARG_ASSERT(1, dim >= 0 && dim < AF_MAX_DIMS);
+        ARG_ASSERT(2, n_arrays > 0);
+
+        const af_array *inputIt{inputs};
+        const af_array *inputEnd{inputs + n_arrays};
+        while ((inputIt != inputEnd) && (getInfo(*inputIt).elements() == 0)) {
+            ++inputIt;
+        }
+        if (inputIt == inputEnd) {
+            // All arrays have 0 elements
+            af_array ret = nullptr;
+            AF_CHECK(af_retain_array(&ret, *inputs));
+            std::swap(*out, ret);
+            return AF_SUCCESS;
         }
 
-        ARG_ASSERT(1, dim >= 0 && dim < 4);
+        // inputIt points to first non empty array
+        const af_dtype assertType{getInfo(*inputIt).getType()};
+        const dim4 &assertDims{getInfo(*inputIt).dims()};
 
-        for (unsigned i = 1; i < n_arrays; i++) {
-            ARG_ASSERT(3, info[0].getType() == info[i].getType());
-            DIM_ASSERT(3, info[i].elements() > 0);
-        }
-
-        // All dimensions except join dimension must be equal
-        // Compute output dims
-        for (int i = 0; i < 4; i++) {
-            if (i != dim) {
-                for (unsigned j = 1; j < n_arrays; j++) {
-                    DIM_ASSERT(3, dims[0][i] == dims[j][i]);
+        // Check all remaining arrays on assertType and assertDims
+        while (++inputIt != inputEnd) {
+            const ArrayInfo &info = getInfo(*inputIt);
+            if (info.elements() > 0) {
+                ARG_ASSERT(3, assertType == info.getType());
+                const dim4 &infoDims{getInfo(*inputIt).dims()};
+                // All dimensions except join dimension must be equal
+                for (int i{0}; i < AF_MAX_DIMS; i++) {
+                    if (i != dim) {
+                        DIM_ASSERT(3, assertDims.dims[i] == infoDims.dims[i]);
+                    }
                 }
             }
         }
-
         af_array output;
 
-        switch (info[0].getType()) {
+        switch (assertType) {
             case f32: output = join_many<float>(dim, n_arrays, inputs); break;
             case c32: output = join_many<cfloat>(dim, n_arrays, inputs); break;
             case f64: output = join_many<double>(dim, n_arrays, inputs); break;
@@ -146,9 +171,10 @@ af_err af_join_many(af_array *out, const int dim, const unsigned n_arrays,
             case u64: output = join_many<uintl>(dim, n_arrays, inputs); break;
             case s16: output = join_many<short>(dim, n_arrays, inputs); break;
             case u16: output = join_many<ushort>(dim, n_arrays, inputs); break;
+            case s8: output = join_many<schar>(dim, n_arrays, inputs); break;
             case u8: output = join_many<uchar>(dim, n_arrays, inputs); break;
             case f16: output = join_many<half>(dim, n_arrays, inputs); break;
-            default: TYPE_ERROR(1, info[0].getType());
+            default: TYPE_ERROR(1, assertType);
         }
         swap(*out, output);
     }

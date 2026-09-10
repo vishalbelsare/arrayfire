@@ -48,8 +48,8 @@ void scanTest(string pTestFile, int off = 0, bool isSubRef = false,
 
     vector<dim4> numDims;
 
-    vector<vector<int> > data;
-    vector<vector<int> > tests;
+    vector<vector<int>> data;
+    vector<vector<int>> tests;
     readTests<int, int, int>(pTestFile, numDims, data, tests);
     dim4 dims = numDims[0];
 
@@ -113,6 +113,7 @@ SCAN_TESTS(accum, cdouble, cdouble, cdouble);
 SCAN_TESTS(accum, unsigned, unsigned, unsigned);
 SCAN_TESTS(accum, intl, intl, intl);
 SCAN_TESTS(accum, uintl, uintl, uintl);
+SCAN_TESTS(accum, schar, schar, int);
 SCAN_TESTS(accum, uchar, uchar, unsigned);
 SCAN_TESTS(accum, short, short, int);
 SCAN_TESTS(accum, ushort, ushort, uint);
@@ -129,8 +130,8 @@ TEST(Scan, Test_Scan_Big1) {
 TEST(Accum, CPP) {
     vector<dim4> numDims;
 
-    vector<vector<int> > data;
-    vector<vector<int> > tests;
+    vector<vector<int>> data;
+    vector<vector<int>> tests;
     readTests<int, int, int>(string(TEST_DIR "/scan/accum.test"), numDims, data,
                              tests);
     dim4 dims = numDims[0];
@@ -345,3 +346,22 @@ TEST(Scan, ExclusiveSum2D_Dim3) {
 
     ASSERT_ARRAYS_EQ(gold, out);
 }
+
+#define TEST_TEMP_FORMAT(form, dim)                                      \
+    TEST(TEMP_FORMAT, form##_Dim##dim) {                                 \
+        const dim4 dims(2, 2, 2, 2);                                     \
+        const array in(af::moddims(range(dim4(dims.elements())), dims)); \
+        in.eval();                                                       \
+        const array gold = scan(in, dim);                                \
+                                                                         \
+        array out = scan(toTempFormat(form, in), dim);                   \
+        ASSERT_ARRAYS_EQ(gold, out);                                     \
+    }
+
+#define TEST_TEMP_FORMATS(form) \
+    TEST_TEMP_FORMAT(form, 0)   \
+    TEST_TEMP_FORMAT(form, 1)   \
+    TEST_TEMP_FORMAT(form, 2)   \
+    TEST_TEMP_FORMAT(form, 3)
+
+FOREACH_TEMP_FORMAT(TEST_TEMP_FORMATS)

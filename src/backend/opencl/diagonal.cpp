@@ -15,8 +15,9 @@
 #include <math.hpp>
 #include <af/dim4.hpp>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> diagCreate(const Array<T> &in, const int num) {
@@ -53,9 +54,11 @@ INSTANTIATE_DIAGONAL(uint)
 INSTANTIATE_DIAGONAL(intl)
 INSTANTIATE_DIAGONAL(uintl)
 INSTANTIATE_DIAGONAL(char)
+INSTANTIATE_DIAGONAL(schar)
 INSTANTIATE_DIAGONAL(uchar)
 INSTANTIATE_DIAGONAL(short)
 INSTANTIATE_DIAGONAL(ushort)
 INSTANTIATE_DIAGONAL(half)
 
 }  // namespace opencl
+}  // namespace arrayfire

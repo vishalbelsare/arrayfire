@@ -12,6 +12,7 @@
 #include <err_opencl.hpp>
 #include <kernel/flood_fill.hpp>
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T>
@@ -33,6 +34,8 @@ Array<T> floodFill(const Array<T>& image, const Array<uint>& seedsX,
 INSTANTIATE(float)
 INSTANTIATE(uint)
 INSTANTIATE(ushort)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 
 }  // namespace opencl
+}  // namespace arrayfire

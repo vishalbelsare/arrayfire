@@ -18,6 +18,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace cpu {
 template<typename T>
 Array<T> morph(const Array<T> &in, const Array<T> &mask, bool isDilation) {
@@ -66,7 +67,9 @@ INSTANTIATE(double)
 INSTANTIATE(char)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(ushort)
 INSTANTIATE(short)
 }  // namespace cpu
+}  // namespace arrayfire

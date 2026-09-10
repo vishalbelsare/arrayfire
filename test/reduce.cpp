@@ -13,7 +13,9 @@
 #include <af/dim4.hpp>
 #include <af/traits.hpp>
 
+#include <math.h>
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <string>
@@ -34,10 +36,14 @@ using std::vector;
 template<typename T>
 class Reduce : public ::testing::Test {};
 
+template<typename T>
+class ReduceByKey : public ::testing::Test {};
+
 typedef ::testing::Types<float, double, cfloat, cdouble, uint, int, intl, uintl,
-                         uchar, short, ushort>
+                         schar, uchar, short, ushort>
     TestTypes;
-TYPED_TEST_CASE(Reduce, TestTypes);
+TYPED_TEST_SUITE(Reduce, TestTypes);
+TYPED_TEST_SUITE(ReduceByKey, TestTypes);
 
 typedef af_err (*reduceFunc)(af_array *, const af_array, const int);
 
@@ -49,8 +55,8 @@ void reduceTest(string pTestFile, int off = 0, bool isSubRef = false,
 
     vector<dim4> numDims;
 
-    vector<vector<int> > data;
-    vector<vector<int> > tests;
+    vector<vector<int>> data;
+    vector<vector<int>> tests;
     readTests<int, int, int>(pTestFile, numDims, data, tests);
     dim4 dims = numDims[0];
 
@@ -96,7 +102,6 @@ void reduceTest(string pTestFile, int off = 0, bool isSubRef = false,
                 EXPECT_EQ(currGoldBar[elIter], outData[elIter])
                     << "at: " << elIter << " for dim " << d + off << endl;
             }
-            af_print_array(outArray);
             for (int i = 0; i < (int)nElems; i++) {
                 cout << currGoldBar[i] << ", ";
             }
@@ -121,6 +126,10 @@ struct promote_type {
 
 // char and uchar are promoted to int for sum and product
 template<>
+struct promote_type<schar, af_sum> {
+    typedef int type;
+};
+template<>
 struct promote_type<uchar, af_sum> {
     typedef uint type;
 };
@@ -137,6 +146,10 @@ struct promote_type<ushort, af_sum> {
     typedef uint type;
 };
 template<>
+struct promote_type<schar, af_product> {
+    typedef int type;
+};
+template<>
 struct promote_type<uchar, af_product> {
     typedef uint type;
 };
@@ -151,6 +164,16 @@ struct promote_type<short, af_product> {
 template<>
 struct promote_type<ushort, af_product> {
     typedef uint type;
+};
+
+// float16 is promoted to float32 for sum and product
+template<>
+struct promote_type<half_float::half, af_sum> {
+    typedef float type;
+};
+template<>
+struct promote_type<half_float::half, af_product> {
+    typedef float type;
 };
 
 #define REDUCE_TESTS(FN)                                                       \
@@ -216,8 +239,8 @@ void cppReduceTest(string pTestFile) {
 
     vector<dim4> numDims;
 
-    vector<vector<int> > data;
-    vector<vector<int> > tests;
+    vector<vector<int>> data;
+    vector<vector<int>> tests;
     readTests<int, int, int>(pTestFile, numDims, data, tests);
     dim4 dims = numDims[0];
 
@@ -374,6 +397,7 @@ array ptrToArray(size_t size, void *ptr, af_dtype type) {
         case u16: res = array(size, (unsigned short *)ptr); break;
         case s16: res = array(size, (short *)ptr); break;
         case b8: res = array(size, (char *)ptr); break;
+        case s8: res = array(size, (signed char *)ptr); break;
         case u8: res = array(size, (unsigned char *)ptr); break;
         case f16: res = array(size, (half_float::half *)ptr); break;
     }
@@ -394,6 +418,7 @@ array ptrToArray(af::dim4 size, void *ptr, af_dtype type) {
         case u16: res = array(size, (unsigned short *)ptr); break;
         case s16: res = array(size, (short *)ptr); break;
         case b8: res = array(size, (char *)ptr); break;
+        case s8: res = array(size, (signed char *)ptr); break;
         case u8: res = array(size, (unsigned char *)ptr); break;
         case f16: res = array(size, (half_float::half *)ptr); break;
     }
@@ -407,7 +432,12 @@ class ReduceByKeyP : public ::testing::TestWithParam<reduce_by_key_params *> {
 
     void SetUp() {
         reduce_by_key_params *params = GetParam();
-        if (noHalfTests(params->vType_)) { return; }
+        if (noHalfTests(params->vType_)) {
+            GTEST_SKIP() << "Half not supported on this device";
+        }
+        if (noDoubleTests(GetParam()->vType_)) {
+            GTEST_SKIP() << "Double not supported on this device";
+        }
 
         keys = ptrToArray(params->iSize, params->iKeys_, params->kType_);
         vals = ptrToArray(params->iSize, params->iVals_, params->vType_);
@@ -424,7 +454,7 @@ template<typename T>
 struct generateConsq {
     T vals;
 
-    generateConsq(T v_i = 0) : vals(v_i){};
+    generateConsq(T v_i = 0) : vals(v_i) {};
 
     T operator()() { return vals++; }
 };
@@ -433,7 +463,7 @@ template<typename T>
 struct generateConst {
     T vals;
 
-    generateConst(T v_i) : vals(v_i){};
+    generateConst(T v_i) : vals(v_i) {};
 
     T operator()() { return vals; }
 };
@@ -506,7 +536,7 @@ vector<reduce_by_key_params*> genSingleKeyTests() {
 
 vector<reduce_by_key_params *> generateAllTypes() {
     vector<reduce_by_key_params *> out;
-    vector<vector<reduce_by_key_params *> > tmp{
+    vector<vector<reduce_by_key_params *>> tmp{
         genUniqueKeyTests<int, float, float>(),
         genSingleKeyTests<int, float, float>(),
         genUniqueKeyTests<unsigned, float, float>(),
@@ -545,12 +575,20 @@ string testNameGenerator(
     return s.str();
 }
 
-INSTANTIATE_TEST_CASE_P(UniqueKeyTests, ReduceByKeyP,
-                        ::testing::ValuesIn(generateAllTypes()),
-                        testNameGenerator<ReduceByKeyP>);
+INSTANTIATE_TEST_SUITE_P(UniqueKeyTests, ReduceByKeyP,
+                         ::testing::ValuesIn(generateAllTypes()),
+                         testNameGenerator<ReduceByKeyP>);
 
 TEST_P(ReduceByKeyP, SumDim0) {
-    if (noHalfTests(GetParam()->vType_)) { return; }
+    if (noHalfTests(GetParam()->vType_)) {
+        GTEST_SKIP() << "Half not supported on this device";
+    }
+    if (noHalfTests(GetParam()->kType_)) {
+        GTEST_SKIP() << "Half not supported on this device";
+    }
+    if (noDoubleTests(GetParam()->vType_)) {
+        GTEST_SKIP() << "Double not supported on this device";
+    }
     array keyRes, valsReduced;
     sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
 
@@ -559,7 +597,15 @@ TEST_P(ReduceByKeyP, SumDim0) {
 }
 
 TEST_P(ReduceByKeyP, SumDim2) {
-    if (noHalfTests(GetParam()->vType_)) { return; }
+    if (noHalfTests(GetParam()->vType_)) {
+        GTEST_SKIP() << "Half not supported on this device";
+    }
+    if (noHalfTests(GetParam()->kType_)) {
+        GTEST_SKIP() << "Half not supported on this device";
+    }
+    if (noDoubleTests(GetParam()->vType_)) {
+        GTEST_SKIP() << "Double not supported on this device";
+    }
     const int ntile = 2;
     vals            = tile(vals, 1, ntile, 1, 1);
     vals            = reorder(vals, 1, 2, 0, 3);
@@ -576,12 +622,16 @@ TEST_P(ReduceByKeyP, SumDim2) {
     ASSERT_ARRAYS_NEAR(valsReducedGold, valsReduced, 1e-5);
 }
 
-TEST(ReduceByKey, MultiBlockReduceSingleval) {
+TYPED_TEST(ReduceByKey, MultiBlockReduceSingleval) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
     array keys = constant(0, 1024 * 1024, s32);
-    array vals = constant(1, 1024 * 1024, f32);
+    array vals = constant(1, 1024 * 1024,
+                          (af_dtype)af::dtype_traits<TypeParam>::af_type);
 
     array keyResGold      = constant(0, 1);
-    array valsReducedGold = constant(1024 * 1024, 1, f32);
+    using promoted_t      = typename promote_type<TypeParam, af_sum>::type;
+    array valsReducedGold = constant(
+        1024 * 1024, 1, (af_dtype)af::dtype_traits<promoted_t>::af_type);
 
     array keyRes, valsReduced;
     sumByKey(keyRes, valsReduced, keys, vals);
@@ -592,8 +642,8 @@ TEST(ReduceByKey, MultiBlockReduceSingleval) {
 
 void reduce_by_key_test(std::string test_fn) {
     vector<dim4> numDims;
-    vector<vector<float> > data;
-    vector<vector<float> > tests;
+    vector<vector<float>> data;
+    vector<vector<float>> tests;
     readTests<float, float, float>(test_fn, numDims, data, tests);
 
     for (size_t t = 0; t < numDims.size() / 2; ++t) {
@@ -679,10 +729,11 @@ TEST(ReduceByKey, MultiBlockReduceByKeyRandom500) {
     reduce_by_key_test(string(TEST_DIR "/reduce/test_random500_by_key.test"));
 }
 
-TEST(ReduceByKey, productReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, productReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -691,15 +742,17 @@ TEST(ReduceByKey, productReduceByKey) {
     productByKey(reduced_keys, reduced_vals, keys, vals, 0, 1);
 
     const int goldSz = 5;
-    const vector<float> gold_reduce{0, 7, 6, 30, 4};
+    using promoted_t = typename promote_type<TypeParam, af_product>::type;
+    const vector<promoted_t> gold_reduce{0, 7, 6, 30, 4};
 
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, minReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, minReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -708,14 +761,15 @@ TEST(ReduceByKey, minReduceByKey) {
     minByKey(reduced_keys, reduced_vals, keys, vals);
 
     const int goldSz = 5;
-    const vector<float> gold_reduce{0, 1, 6, 2, 4};
+    const vector<TypeParam> gold_reduce{0, 1, 6, 2, 4};
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, maxReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, maxReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -724,14 +778,15 @@ TEST(ReduceByKey, maxReduceByKey) {
     maxByKey(reduced_keys, reduced_vals, keys, vals);
 
     const int goldSz = 5;
-    const vector<float> gold_reduce{0, 7, 6, 5, 4};
+    const vector<TypeParam> gold_reduce{0, 7, 6, 5, 4};
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, allTrueReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 1, 1, 1, 0, 1, 1, 1};
+TYPED_TEST(ReduceByKey, allTrueReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 1, 1, 1, 0, 1, 1, 1};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -744,10 +799,11 @@ TEST(ReduceByKey, allTrueReduceByKey) {
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, anyTrueReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 8, 8};
-    const float testVals[testSz] = {0, 1, 1, 1, 0, 1, 0, 0};
+TYPED_TEST(ReduceByKey, anyTrueReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 8, 8};
+    const TypeParam testVals[testSz] = {0, 1, 1, 1, 0, 1, 0, 0};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -761,10 +817,11 @@ TEST(ReduceByKey, anyTrueReduceByKey) {
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, countReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 5};
-    const float testVals[testSz] = {0, 1, 1, 1, 0, 1, 1, 1};
+TYPED_TEST(ReduceByKey, countReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 5};
+    const TypeParam testVals[testSz] = {0, 1, 1, 1, 0, 1, 1, 1};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -777,10 +834,18 @@ TEST(ReduceByKey, countReduceByKey) {
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, ReduceByKeyNans) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, NAN, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, ReduceByKeyNans) {
+    if (!IsFloatingPoint<TypeParam>::value) {
+        SUCCEED() << "Not a floating point type.";
+        return;
+    }
+
+    SKIP_IF_FAST_MATH_ENABLED();
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz    = 8;
+    const int testKeys[testSz] = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam nan        = std::numeric_limits<TypeParam>::quiet_NaN();
+    const TypeParam testVals[testSz] = {0, 7, nan, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -789,14 +854,16 @@ TEST(ReduceByKey, ReduceByKeyNans) {
     productByKey(reduced_keys, reduced_vals, keys, vals, 0, 1);
 
     const int goldSz = 5;
-    const vector<float> gold_reduce{0, 7, 6, 30, 4};
+    using promoted_t = typename promote_type<TypeParam, af_product>::type;
+    const vector<promoted_t> gold_reduce{0, 7, 6, 30, 4};
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, nDim0ReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, nDim0ReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -810,20 +877,22 @@ TEST(ReduceByKey, nDim0ReduceByKey) {
     sumByKey(reduced_keys, reduced_vals, keys, vals, dim, nanval);
 
     const dim4 goldSz(5, 2, 2, 2);
-    const vector<float> gold_reduce{0, 8, 6, 10, 4, 0, 8, 6, 10, 4,
+    using promoted_t = typename promote_type<TypeParam, af_sum>::type;
+    const vector<promoted_t> gold_reduce{0, 8, 6, 10, 4, 0, 8, 6, 10, 4,
 
-                                    0, 8, 6, 10, 4, 0, 8, 6, 10, 4,
+                                         0, 8, 6, 10, 4, 0, 8, 6, 10, 4,
 
-                                    0, 8, 6, 10, 4, 0, 8, 6, 10, 4,
+                                         0, 8, 6, 10, 4, 0, 8, 6, 10, 4,
 
-                                    0, 8, 6, 10, 4, 0, 8, 6, 10, 4};
+                                         0, 8, 6, 10, 4, 0, 8, 6, 10, 4};
     ASSERT_VEC_ARRAY_EQ(gold_reduce, goldSz, reduced_vals);
 }
 
-TEST(ReduceByKey, nDim1ReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, nDim1ReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -837,9 +906,10 @@ TEST(ReduceByKey, nDim1ReduceByKey) {
     const double nanval = 0.0;
     sumByKey(reduced_keys, reduced_vals, keys, vals, dim, nanval);
 
-    const int goldSz                = 5;
-    const float gold_reduce[goldSz] = {0, 8, 6, 10, 4};
-    vector<float> hreduce(reduced_vals.elements());
+    const int goldSz = 5;
+    using promoted_t = typename promote_type<TypeParam, af_sum>::type;
+    const promoted_t gold_reduce[goldSz] = {0, 8, 6, 10, 4};
+    vector<promoted_t> hreduce(reduced_vals.elements());
     reduced_vals.host(hreduce.data());
 
     for (int i = 0; i < goldSz * ntile; i++) {
@@ -847,10 +917,11 @@ TEST(ReduceByKey, nDim1ReduceByKey) {
     }
 }
 
-TEST(ReduceByKey, nDim2ReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, nDim2ReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -864,9 +935,10 @@ TEST(ReduceByKey, nDim2ReduceByKey) {
     const double nanval = 0.0;
     sumByKey(reduced_keys, reduced_vals, keys, vals, dim, nanval);
 
-    const int goldSz                = 5;
-    const float gold_reduce[goldSz] = {0, 8, 6, 10, 4};
-    vector<float> h_a(reduced_vals.elements());
+    const int goldSz = 5;
+    using promoted_t = typename promote_type<TypeParam, af_sum>::type;
+    const promoted_t gold_reduce[goldSz] = {0, 8, 6, 10, 4};
+    vector<promoted_t> h_a(reduced_vals.elements());
     reduced_vals.host(h_a.data());
 
     for (int i = 0; i < goldSz * ntile; i++) {
@@ -874,10 +946,11 @@ TEST(ReduceByKey, nDim2ReduceByKey) {
     }
 }
 
-TEST(ReduceByKey, nDim3ReduceByKey) {
-    const static int testSz      = 8;
-    const int testKeys[testSz]   = {0, 2, 2, 9, 5, 5, 5, 8};
-    const float testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
+TYPED_TEST(ReduceByKey, nDim3ReduceByKey) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+    const static int testSz          = 8;
+    const int testKeys[testSz]       = {0, 2, 2, 9, 5, 5, 5, 8};
+    const TypeParam testVals[testSz] = {0, 7, 1, 6, 2, 5, 3, 4};
 
     array keys(testSz, testKeys);
     array vals(testSz, testVals);
@@ -891,9 +964,10 @@ TEST(ReduceByKey, nDim3ReduceByKey) {
     const double nanval = 0.0;
     sumByKey(reduced_keys, reduced_vals, keys, vals, dim, nanval);
 
-    const int goldSz                = 5;
-    const float gold_reduce[goldSz] = {0, 8, 6, 10, 4};
-    vector<float> h_a(reduced_vals.elements());
+    const int goldSz = 5;
+    using promoted_t = typename promote_type<TypeParam, af_sum>::type;
+    const promoted_t gold_reduce[goldSz] = {0, 8, 6, 10, 4};
+    vector<promoted_t> h_a(reduced_vals.elements());
     reduced_vals.host(h_a.data());
 
     for (int i = 0; i < goldSz * ntile; i++) {
@@ -1071,6 +1145,7 @@ TYPED_TEST(Reduce, Test_Any_Global) {
 }
 
 TEST(MinMax, MinMaxNaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     const int num      = 10000;
     array A            = randu(num);
     A(where(A < 0.25)) = NaN;
@@ -1094,6 +1169,7 @@ TEST(MinMax, MinMaxNaN) {
 }
 
 TEST(MinMax, MinCplxNaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     float real_wnan_data[] = {0.005f, NAN, -6.3f, NAN,      -0.5f,
                               NAN,    NAN, 0.2f,  -1205.4f, 8.9f};
 
@@ -1111,7 +1187,7 @@ TEST(MinMax, MinCplxNaN) {
 
     array min_val = af::min(a);
 
-    vector<complex<float> > h_min_val(cols);
+    vector<complex<float>> h_min_val(cols);
     min_val.host(&h_min_val[0]);
 
     for (int i = 0; i < cols; i++) {
@@ -1121,6 +1197,7 @@ TEST(MinMax, MinCplxNaN) {
 }
 
 TEST(MinMax, MaxCplxNaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     // 4th element is unusually large to cover the case where
     //  one part holds the largest value among the array,
     //  and the other part is NaN.
@@ -1147,7 +1224,7 @@ TEST(MinMax, MaxCplxNaN) {
 
     array max_val = af::max(a);
 
-    vector<complex<float> > h_max_val(cols);
+    vector<complex<float>> h_max_val(cols);
     max_val.host(&h_max_val[0]);
 
     for (int i = 0; i < cols; i++) {
@@ -1157,6 +1234,7 @@ TEST(MinMax, MaxCplxNaN) {
 }
 
 TEST(Count, NaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     const int num = 10000;
     array A       = round(5 * randu(num));
     array B       = A;
@@ -1167,6 +1245,7 @@ TEST(Count, NaN) {
 }
 
 TEST(Sum, NaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     const int num      = 10000;
     array A            = randu(num);
     A(where(A < 0.25)) = NaN;
@@ -1186,6 +1265,7 @@ TEST(Sum, NaN) {
 }
 
 TEST(Product, NaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     const int num = 5;
     array A       = randu(num);
     A(2)          = NaN;
@@ -1205,6 +1285,7 @@ TEST(Product, NaN) {
 }
 
 TEST(AnyAll, NaN) {
+    SKIP_IF_FAST_MATH_ENABLED();
     const int num = 10000;
     array A       = (randu(num) > 0.5).as(f32);
     array B       = A;
@@ -1263,10 +1344,14 @@ TEST(Reduce, KernelName) {
 }
 
 TEST(Reduce, AllSmallIndexed) {
-    const int len = 1000;
-    array a       = af::range(dim4(len, 2));
-    array b       = a(seq(len / 2), span);
-    ASSERT_EQ(max<float>(b), len / 2 - 1);
+    const int len = 512;
+    for (int i = 0; i < 1000; ++i) {
+        // const int len = 10000;
+        array a = af::range(dim4(len, 2));
+        array b = a(seq(len / 2), span);
+        // af::sync();
+        ASSERT_EQ(max<float>(b), len / 2 - 1);
+    }
 }
 
 TEST(ProductAll, BoolIn_ISSUE2543_All_Ones) {
@@ -1302,7 +1387,7 @@ struct reduce_params {
 
 class ReduceHalf : public ::testing::TestWithParam<reduce_params> {};
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     SumFirstNonZeroDim, ReduceHalf,
     ::testing::Values(
         reduce_params(1, dim4(10), dim4(1), -1),
@@ -1325,7 +1410,7 @@ INSTANTIATE_TEST_CASE_P(
         reduce_params(1, dim4(8192, 10, 10), dim4(1, 10, 10), -1),
         reduce_params(1, dim4(8192, 10, 10, 10), dim4(1, 10, 10, 10), -1)));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     SumNonZeroDim, ReduceHalf,
     ::testing::Values(
         reduce_params(1.25, dim4(10, 10), dim4(10), 1),
@@ -1933,7 +2018,12 @@ class RaggedReduceMaxRangeP : public ::testing::TestWithParam<ragged_params *> {
 
     void SetUp() {
         ragged_params *params = GetParam();
-        if (noHalfTests(params->vType_)) { return; }
+        if (noHalfTests(params->vType_)) {
+            GTEST_SKIP() << "Half not supported on this device";
+        }
+        if (noDoubleTests(GetParam()->vType_)) {
+            GTEST_SKIP() << "Double not supported on this device";
+        }
 
         const size_t rdim_size = params->reduceDimLen_;
         const int dim          = params->reduceDim_;
@@ -1999,15 +2089,14 @@ vector<ragged_params *> genRaggedRangeTests() {
           ragged_range_data<unsigned, Tv, To>("ragged_range", 1024 * 1025, 3),
     };
 }
+// clang-format on
 
 vector<ragged_params *> generateAllTypesRagged() {
     vector<ragged_params *> out;
-    vector<vector<ragged_params *> > tmp{
-        genRaggedRangeTests<int, int>(),
-        genRaggedRangeTests<float, float>(),
+    vector<vector<ragged_params *>> tmp{
+        genRaggedRangeTests<int, int>(), genRaggedRangeTests<float, float>(),
         genRaggedRangeTests<double, double>(),
-        genRaggedRangeTests<half_float::half, half_float::half>()
-    };
+        genRaggedRangeTests<half_float::half, half_float::half>()};
 
     for (auto &v : tmp) { copy(begin(v), end(v), back_inserter(out)); }
     return out;
@@ -2019,33 +2108,33 @@ string testNameGeneratorRagged(
     af_dtype lt = info.param->lType_;
     af_dtype vt = info.param->vType_;
     size_t size = info.param->reduceDimLen_;
-    int rdim = info.param->reduceDim_;
+    int rdim    = info.param->reduceDim_;
     std::stringstream s;
     s << info.param->testname_ << "_lenType_" << lt << "_valueType_" << vt
       << "_size_" << size << "_reduceDim_" << rdim;
     return s.str();
 }
 
-INSTANTIATE_TEST_CASE_P(RaggedReduceTests, RaggedReduceMaxRangeP,
-                        ::testing::ValuesIn(generateAllTypesRagged()),
-                        testNameGeneratorRagged<RaggedReduceMaxRangeP>);
+INSTANTIATE_TEST_SUITE_P(RaggedReduceTests, RaggedReduceMaxRangeP,
+                         ::testing::ValuesIn(generateAllTypesRagged()),
+                         testNameGeneratorRagged<RaggedReduceMaxRangeP>);
 
 TEST_P(RaggedReduceMaxRangeP, rangeMaxTest) {
-    if (noHalfTests(GetParam()->vType_)) { return; }
-
+    if (noHalfTests(GetParam()->vType_)) {
+        GTEST_SKIP() << "Half not supported on this device";
+    }
     array ragged_max, idx;
     const int dim = GetParam()->reduceDim_;
     max(ragged_max, idx, vals, ragged_lens, dim);
 
     ASSERT_ARRAYS_EQ(valsReducedGold, ragged_max);
     ASSERT_ARRAYS_EQ(idxsReducedGold, idx);
-
 }
 
 TEST(ReduceByKey, ISSUE_2955) {
-    int N = 256;
-    af::array val = af::randu(N);
-    af::array key = af::range(af::dim4(N), 0, af::dtype::s32);
+    int N                  = 256;
+    af::array val          = af::randu(N);
+    af::array key          = af::range(af::dim4(N), 0, af::dtype::s32);
     key(seq(127, af::end)) = 1;
 
     af::array ok, ov;
@@ -2055,9 +2144,9 @@ TEST(ReduceByKey, ISSUE_2955) {
 }
 
 TEST(ReduceByKey, ISSUE_2955_dim) {
-    int N = 256;
-    af::array val = af::randu(8, N);
-    af::array key = af::range(af::dim4(N), 0, af::dtype::s32);
+    int N                  = 256;
+    af::array val          = af::randu(8, N);
+    af::array key          = af::range(af::dim4(N), 0, af::dtype::s32);
     key(seq(127, af::end)) = 1;
 
     af::array ok, ov;
@@ -2069,7 +2158,7 @@ TEST(ReduceByKey, ISSUE_2955_dim) {
 TEST(ReduceByKey, ISSUE_3062) {
     size_t N = 129;
 
-    af::array ones = af::constant(1, N, u32);
+    af::array ones  = af::constant(1, N, u32);
     af::array zeros = af::constant(0, N, u32);
 
     af::array okeys;
@@ -2082,7 +2171,7 @@ TEST(ReduceByKey, ISSUE_3062) {
     ASSERT_EQ(ovalues.scalar<unsigned>(), 129);
 
     // test reduction on non-zero dimension as well
-    ones = af::constant(1, 2, N, u32);
+    ones  = af::constant(1, 2, N, u32);
     zeros = af::constant(0, N, u32);
 
     af::sumByKey(okeys, ovalues, zeros, ones, 1);
@@ -2091,3 +2180,358 @@ TEST(ReduceByKey, ISSUE_3062) {
     af::countByKey(okeys, ovalues, zeros, ones, 1);
     ASSERT_EQ(ovalues.scalar<unsigned>(), 129);
 }
+
+TEST(Reduce, Test_Sum_Global_Array) {
+    const int num = 513;
+    array a       = af::randn(num, 2, 33, 4);
+
+    float res         = af::sum<float>(a);
+    array full_reduce = af::sum<af::array>(a);
+
+    float *h_a = a.host<float>();
+    float gold = 0.f;
+
+    for (int i = 0; i < a.elements(); i++) { gold += h_a[i]; }
+
+    float max_error =
+        std::numeric_limits<float>::epsilon() * (float)a.elements();
+    ASSERT_NEAR(gold, res, max_error);
+    ASSERT_NEAR(res, full_reduce.scalar<float>(), max_error);
+    freeHost(h_a);
+}
+
+TEST(Reduce, Test_Product_Global_Array) {
+    const int num = 512;
+    array a       = 1 + (0.005 * af::randn(num, 2, 3, 4));
+
+    float res         = af::product<float>(a);
+    array full_reduce = af::product<af::array>(a);
+
+    float *h_a = a.host<float>();
+    float gold = 1.f;
+
+    for (int i = 0; i < a.elements(); i++) { gold *= h_a[i]; }
+
+    float max_error =
+        std::numeric_limits<float>::epsilon() * (float)a.elements();
+    ASSERT_NEAR(gold, res, max_error);
+    ASSERT_NEAR(res, full_reduce.scalar<float>(), max_error);
+    freeHost(h_a);
+}
+
+TEST(Reduce, Test_Count_Global_Array) {
+    const int num = 10000;
+    array a       = round(2 * randu(num, 2, 3, 4));
+    array b       = a.as(b8);
+
+    int res       = count<int>(b);
+    array res_arr = count<af::array>(b);
+    char *h_b     = b.host<char>();
+    unsigned gold = 0;
+
+    for (int i = 0; i < a.elements(); i++) { gold += h_b[i]; }
+
+    ASSERT_EQ(gold, res);
+    ASSERT_EQ(gold, res_arr.scalar<unsigned>());
+    freeHost(h_b);
+}
+
+TEST(Reduce, Test_min_Global_Array) {
+    SUPPORTED_TYPE_CHECK(double);
+
+    const int num = 10000;
+    array a       = af::randn(num, 2, 3, 4, f64);
+    double res    = min<double>(a);
+    array res_arr = min<af::array>(a);
+    double *h_a   = a.host<double>();
+    double gold   = std::numeric_limits<double>::max();
+
+    SUPPORTED_TYPE_CHECK(double);
+
+    for (int i = 0; i < a.elements(); i++) { gold = std::min(gold, h_a[i]); }
+
+    ASSERT_EQ(gold, res);
+    ASSERT_EQ(gold, res_arr.scalar<double>());
+    freeHost(h_a);
+}
+
+TEST(Reduce, Test_max_Global_Array) {
+    const int num = 10000;
+    array a       = af::randn(num, 2, 3, 4);
+    float res     = max<float>(a);
+    array res_arr = max<af::array>(a);
+    float *h_a    = a.host<float>();
+    float gold    = -std::numeric_limits<float>::max();
+
+    for (int i = 0; i < a.elements(); i++) { gold = std::max(gold, h_a[i]); }
+
+    ASSERT_EQ(gold, res);
+    ASSERT_EQ(gold, res_arr.scalar<float>());
+    freeHost(h_a);
+}
+
+TYPED_TEST(Reduce, Test_All_Global_Array) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+
+    // Input size test
+    for (int i = 1; i < 1000; i += 100) {
+        int num = 10 * i;
+        vector<TypeParam> h_vals(num, (TypeParam) true);
+        array a(2, num / 2, &h_vals.front());
+
+        TypeParam res = allTrue<TypeParam>(a);
+        array res_arr = allTrue<array>(a);
+        typed_assert_eq((TypeParam) true, res, false);
+        typed_assert_eq((TypeParam) true, (TypeParam)res_arr.scalar<char>(),
+                        false);
+
+        h_vals[3] = false;
+        a         = array(2, num / 2, &h_vals.front());
+
+        res     = allTrue<TypeParam>(a);
+        res_arr = allTrue<array>(a);
+        typed_assert_eq((TypeParam) false, res, false);
+        typed_assert_eq((TypeParam) false, (TypeParam)res_arr.scalar<char>(),
+                        false);
+    }
+
+    // false value location test
+    const int num = 10000;
+    vector<TypeParam> h_vals(num, (TypeParam) true);
+    for (int i = 1; i < 10000; i += 100) {
+        h_vals[i] = false;
+        array a(2, num / 2, &h_vals.front());
+
+        TypeParam res = allTrue<TypeParam>(a);
+        array res_arr = allTrue<array>(a);
+        typed_assert_eq((TypeParam) false, res, false);
+        typed_assert_eq((TypeParam) false, (TypeParam)res_arr.scalar<char>(),
+                        false);
+
+        h_vals[i] = true;
+    }
+}
+
+TYPED_TEST(Reduce, Test_Any_Global_Array) {
+    SUPPORTED_TYPE_CHECK(TypeParam);
+
+    // Input size test
+    for (int i = 1; i < 1000; i += 100) {
+        int num = 10 * i;
+        vector<TypeParam> h_vals(num, (TypeParam) false);
+        array a(2, num / 2, &h_vals.front());
+
+        TypeParam res = anyTrue<TypeParam>(a);
+        array res_arr = anyTrue<array>(a);
+        typed_assert_eq((TypeParam) false, res, false);
+        typed_assert_eq((TypeParam) false, (TypeParam)res_arr.scalar<char>(),
+                        false);
+
+        h_vals[3] = true;
+        a         = array(2, num / 2, &h_vals.front());
+
+        res     = anyTrue<TypeParam>(a);
+        res_arr = anyTrue<array>(a);
+        typed_assert_eq((TypeParam) true, (TypeParam)res_arr.scalar<char>(),
+                        false);
+    }
+
+    // true value location test
+    const int num = 10000;
+    vector<TypeParam> h_vals(num, (TypeParam) false);
+    for (int i = 1; i < 10000; i += 100) {
+        h_vals[i] = true;
+        array a(2, num / 2, &h_vals.front());
+
+        TypeParam res = anyTrue<TypeParam>(a);
+        array res_arr = anyTrue<array>(a);
+        typed_assert_eq((TypeParam) true, res, false);
+        typed_assert_eq((TypeParam) true, (TypeParam)res_arr.scalar<char>(),
+                        false);
+
+        h_vals[i] = false;
+    }
+}
+
+TEST(Reduce, Test_Sum_Global_Array_nanval) {
+    SKIP_IF_FAST_MATH_ENABLED();
+    const int num = 100000;
+    array a       = af::randn(num, 2, 34, 4);
+    a(1, 0, 0, 0) = NAN;
+    a(0, 1, 0, 0) = NAN;
+    a(0, 0, 1, 0) = NAN;
+    a(0, 0, 0, 1) = NAN;
+
+    double nanval     = 0.2;
+    float res         = af::sum<float>(a, nanval);
+    array full_reduce = af::sum<af::array>(a, nanval);
+
+    float *h_a = a.host<float>();
+    float gold = 0.f;
+
+    for (int i = 0; i < a.elements(); i++) {
+        gold += (isnan(h_a[i])) ? nanval : h_a[i];
+    }
+    float max_error =
+        std::numeric_limits<float>::epsilon() * (float)a.elements();
+    ASSERT_NEAR(gold, res, max_error);
+    ASSERT_NEAR(res, full_reduce.scalar<float>(), max_error);
+    freeHost(h_a);
+}
+
+TEST(Reduce, nanval_issue_3255) {
+    SKIP_IF_FAST_MATH_ENABLED();
+    SUPPORTED_TYPE_CHECK(double);
+    char *info_str;
+    af_array ikeys, ivals, okeys, ovals;
+    dim_t dims[1] = {8};
+
+    int ikeys_src[8] = {0, 0, 1, 1, 1, 2, 2, 0};
+    ASSERT_SUCCESS(af_create_array(&ikeys, ikeys_src, 1, dims, u32));
+
+    int i;
+    for (i = 0; i < 8; i++) {
+        double ivals_src[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+        ivals_src[i]        = NAN;
+        ASSERT_SUCCESS(af_create_array(&ivals, ivals_src, 1, dims, f64));
+
+        ASSERT_SUCCESS(
+            af_product_by_key_nan(&okeys, &ovals, ikeys, ivals, 0, 1.0));
+        af::array ovals_cpp(ovals);
+        ASSERT_FALSE(af::anyTrue<bool>(af::isNaN(ovals_cpp)));
+        ASSERT_SUCCESS(af_release_array(okeys));
+
+        ASSERT_SUCCESS(af_sum_by_key_nan(&okeys, &ovals, ikeys, ivals, 0, 1.0));
+        ovals_cpp = af::array(ovals);
+
+        ASSERT_FALSE(af::anyTrue<bool>(af::isNaN(ovals_cpp)));
+        ASSERT_SUCCESS(af_release_array(ivals));
+        ASSERT_SUCCESS(af_release_array(okeys));
+    }
+    ASSERT_SUCCESS(af_release_array(ikeys));
+}
+
+TEST(Reduce, SNIPPET_algorithm_func_sum) {
+    // clang-format off
+    //! [ex_algorithm_func_sum]
+    //
+    // Create a, a 2x3 array
+    array a = iota(dim4(2, 3));           // a = [0, 2, 4,
+                                          //      1, 3, 5]
+
+    // Create b by summing across the first dimension
+    array b = sum(a);        // sum across the first dimension, same as sum(a,0)
+
+    // Create c by summing across the second dimension
+    array c = sum(a, 1);     // sum across the second dimension
+
+    // Create d by summing across the third dimension
+    array d = sum(a, 2);     // sum across the third dimension
+
+    // Create e by summing across the fouth dimension
+    array e = sum(a, 3);     // sum acorss the fourth dimension
+
+    // Summing across higher dimensions fails due to stepping out of bounds. For example,
+    // array f = sum(a0, 4)  // fails due to stepping out of bounds
+
+    //! [ex_algorithm_func_sum]
+    // clang-format on
+
+    using std::vector;
+    vector<float> gold_a{0, 1, 2, 3, 4, 5};
+    vector<float> gold_b{1, 5, 9};
+    vector<float> gold_c{6, 9};
+
+    ASSERT_VEC_ARRAY_EQ(gold_a, a.dims(), a);
+    ASSERT_VEC_ARRAY_EQ(gold_b, b.dims(), b);
+    ASSERT_VEC_ARRAY_EQ(gold_c, c.dims(), c);
+    ASSERT_VEC_ARRAY_EQ(gold_a, d.dims(), d);
+    ASSERT_VEC_ARRAY_EQ(gold_a, e.dims(), e);
+}
+
+#define TEMP_FORMAT_TESTS_reduce(form, op)                    \
+    TEST(TEMP_FORMAT, form##_##op##_array) {                  \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});    \
+        const array gold = op(in, 3);                         \
+        array out        = op(toTempFormat(form, in), 3);     \
+        EXPECT_ARRAYS_EQ(out, gold);                          \
+    }                                                         \
+    TEST(TEMP_FORMAT, form##_##op##_value) {                  \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});    \
+        const float gold = op<float>(in);                     \
+        float out        = op<float>(toTempFormat(form, in)); \
+        EXPECT_EQ(out, gold);                                 \
+    }
+
+#define TEMP_FORMAT_TESTS_ragged(form, op)                                     \
+    TEST(TEMP_FORMAT, form##_##op##_ragged) {                                  \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});                     \
+        const array ragged_len(dim4(1), {(unsigned)in.elements()});            \
+        array gold_vals, gold_idxs;                                            \
+        op(gold_vals, gold_idxs, in, ragged_len, 3);                           \
+        array vals, idxs;                                                      \
+        op(vals, idxs, toTempFormat(form, in), toTempFormat(form, ragged_len), \
+           3);                                                                 \
+        EXPECT_ARRAYS_EQ(vals, gold_vals);                                     \
+        EXPECT_ARRAYS_EQ(idxs, gold_idxs);                                     \
+    }
+
+#define TEMP_FORMAT_TESTS_ByKey(form, op)                      \
+    TEST(TEMP_FORMAT, form##_##op) {                           \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});     \
+        const array keys(constant(0, in.dims().dims[3], u32)); \
+        keys.eval();                                           \
+        array gold_keys, gold_vals;                            \
+        op(gold_keys, gold_vals, keys, in, 3);                 \
+        array out_keys, out_vals;                              \
+        op(out_keys, out_vals, toTempFormat(form, keys),       \
+           toTempFormat(form, in), 3);                         \
+        EXPECT_ARRAYS_EQ(gold_vals, out_vals);                 \
+        EXPECT_ARRAYS_EQ(gold_keys, out_keys);                 \
+    }
+
+#define TEMP_FORMAT_TESTS_allTest(form, op)                         \
+    TEST(TEMP_FORMAT, form##_##op##_array) {                        \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});          \
+        const array gold = op(in > 2.0, 3);                         \
+        array out        = op(toTempFormat(form, in) > 2.0, 3);     \
+        EXPECT_ARRAYS_EQ(gold, out);                                \
+    }                                                               \
+    TEST(TEMP_FORMAT, form##_##op##_value) {                        \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});          \
+        const float gold = op<float>(in > 2.0);                     \
+        float out        = op<float>(toTempFormat(form, in) > 2.0); \
+        EXPECT_EQ(gold, out);                                       \
+    }
+
+#define TEMP_FORMAT_TESTS_allTestByKey(form, op)               \
+    TEST(TEMP_FORMAT, form##_##op) {                           \
+        const array in(dim4(1, 1, 1, 3), {1.f, 2.f, 3.f});     \
+        const array keys(constant(0, in.dims().dims[3], u32)); \
+        array gold_vals, gold_keys;                            \
+        op(gold_keys, gold_vals, keys, in > 2.0, 3);           \
+        array out_vals, out_keys;                              \
+        op(out_keys, out_vals, toTempFormat(form, keys),       \
+           toTempFormat(form, in) > 2.0, 3);                   \
+        EXPECT_ARRAYS_EQ(gold_vals, out_vals);                 \
+        EXPECT_ARRAYS_EQ(gold_keys, out_keys);                 \
+    }
+
+#define TEMP_FORMATS_TESTS(form)                        \
+    TEMP_FORMAT_TESTS_reduce(form, min);                \
+    TEMP_FORMAT_TESTS_reduce(form, max);                \
+    TEMP_FORMAT_TESTS_reduce(form, sum);                \
+    TEMP_FORMAT_TESTS_reduce(form, product);            \
+    TEMP_FORMAT_TESTS_reduce(form, count);              \
+    TEMP_FORMAT_TESTS_ragged(form, max);                \
+    TEMP_FORMAT_TESTS_ByKey(form, minByKey);            \
+    TEMP_FORMAT_TESTS_ByKey(form, maxByKey);            \
+    TEMP_FORMAT_TESTS_ByKey(form, sumByKey);            \
+    TEMP_FORMAT_TESTS_ByKey(form, productByKey);        \
+    TEMP_FORMAT_TESTS_ByKey(form, countByKey);          \
+    TEMP_FORMAT_TESTS_allTest(form, allTrue);           \
+    TEMP_FORMAT_TESTS_allTest(form, anyTrue);           \
+    TEMP_FORMAT_TESTS_allTestByKey(form, allTrueByKey); \
+    TEMP_FORMAT_TESTS_allTestByKey(form, anyTrueByKey);
+
+FOREACH_TEMP_FORMAT(TEMP_FORMATS_TESTS)

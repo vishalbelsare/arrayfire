@@ -12,11 +12,16 @@
 #include <platform.hpp>
 #include <queue.hpp>
 
+using arrayfire::common::ForgeManager;
+using arrayfire::common::ForgeModule;
+using arrayfire::common::forgePlugin;
+
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
 void copy_histogram(const Array<T> &data, fg_histogram hist) {
-    ForgeModule &_ = graphics::forgePlugin();
+    ForgeModule &_ = forgePlugin();
     data.eval();
     getQueue().sync();
 
@@ -38,8 +43,10 @@ void copy_histogram(const Array<T> &data, fg_histogram hist) {
 INSTANTIATE(float)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 
 }  // namespace cpu
+}  // namespace arrayfire

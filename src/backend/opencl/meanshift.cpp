@@ -15,6 +15,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> meanshift(const Array<T> &in, const float &spatialSigma,
@@ -37,9 +38,11 @@ INSTANTIATE(double)
 INSTANTIATE(char)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
 }  // namespace opencl
+}  // namespace arrayfire

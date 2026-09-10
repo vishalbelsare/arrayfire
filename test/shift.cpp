@@ -42,10 +42,11 @@ class Shift : public ::testing::Test {
 
 // create a list of types to be tested
 typedef ::testing::Types<float, double, cfloat, cdouble, int, unsigned int,
-                         intl, uintl, char, unsigned char, short, ushort>
+                         intl, uintl, char, signed char, unsigned char, short,
+                         ushort>
     TestTypes;
 // register the type list
-TYPED_TEST_CASE(Shift, TestTypes);
+TYPED_TEST_SUITE(Shift, TestTypes);
 
 template<typename T>
 void shiftTest(string pTestFile, const unsigned resultIdx, const int x,
@@ -54,8 +55,8 @@ void shiftTest(string pTestFile, const unsigned resultIdx, const int x,
     SUPPORTED_TYPE_CHECK(T);
 
     vector<dim4> numDims;
-    vector<vector<T> > in;
-    vector<vector<T> > tests;
+    vector<vector<T>> in;
+    vector<vector<T>> tests;
     readTests<T, T, int>(pTestFile, numDims, in, tests);
 
     dim4 idims = numDims[0];
@@ -118,8 +119,8 @@ TEST(Shift, CPP) {
     const unsigned w         = 0;
 
     vector<dim4> numDims;
-    vector<vector<float> > in;
-    vector<vector<float> > tests;
+    vector<vector<float>> in;
+    vector<vector<float>> tests;
     readTests<float, float, int>(string(TEST_DIR "/shift/shift4d.test"),
                                  numDims, in, tests);
 
@@ -145,4 +146,13 @@ TEST(Shift, MaxDim) {
 
     output = abs(input - output);
     ASSERT_EQ(1.f, product<float>(output));
+}
+
+TEST(Shift, RowVector) {
+    const unsigned shift_x = 1;
+    const unsigned shift_y = 1;
+    array input            = iota(dim4(1, 4));
+    array output           = shift(input, shift_x, shift_y);
+    vector<float> gold{3.f, 0.f, 1.f, 2.f};
+    EXPECT_VEC_ARRAY_EQ(gold, dim4(1, 4), output);
 }

@@ -9,6 +9,7 @@
 
 #include <Array.hpp>
 
+#include <common/Logger.hpp>
 #include <common/half.hpp>
 #include <common/jit/NodeIterator.hpp>
 #include <common/jit/ScalarNode.hpp>
@@ -39,18 +40,20 @@ using af::dtype_traits;
 
 using cl::Buffer;
 
-using common::half;
-using common::Node;
-using common::Node_ptr;
-using common::NodeIterator;
-using opencl::jit::BufferNode;
+using arrayfire::common::half;
+using arrayfire::common::Node;
+using arrayfire::common::Node_ptr;
+using arrayfire::common::NodeIterator;
+using arrayfire::opencl::jit::BufferNode;
 
+using nonstd::span;
 using std::accumulate;
 using std::is_standard_layout;
 using std::make_shared;
 using std::shared_ptr;
 using std::vector;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 shared_ptr<BufferNode> bufferNodePtr() {
@@ -99,7 +102,11 @@ Array<T>::Array(const dim4 &dims, Node_ptr n)
            static_cast<af_dtype>(dtype_traits<T>::af_type))
     , data_dims(dims)
     , node(std::move(n))
-    , owner(true) {}
+    , owner(true) {
+    if (node->isBuffer()) {
+        data = std::static_pointer_cast<BufferNode>(node)->getDataPointer();
+    }
+}
 
 template<typename T>
 Array<T>::Array(const dim4 &dims, const T *const in_data)
@@ -182,6 +189,30 @@ Array<T>::Array(const dim4 &dims, const dim4 &strides, dim_t offset_,
     if (!is_device) {
         getQueue().enqueueWriteBuffer(*data.get(), CL_TRUE, 0,
                                       sizeof(T) * info.total(), in_data);
+    }
+}
+
+template<typename T>
+void checkAndMigrate(Array<T> &arr) {
+    int arr_id = arr.getDevId();
+    int cur_id = detail::getActiveDeviceId();
+    if (!isDeviceBufferAccessible(arr_id, cur_id)) {
+        auto getLogger = [&] { return spdlog::get("platform"); };
+        AF_TRACE("Migrating array from {} to {}.", arr_id, cur_id);
+        auto migrated_data           = memAlloc<T>(arr.elements());
+        void *mapped_migrated_buffer = getQueue().enqueueMapBuffer(
+            *migrated_data, CL_TRUE, CL_MAP_WRITE_INVALIDATE_REGION, 0,
+            sizeof(T) * arr.elements());
+        setDevice(arr_id);
+        Buffer &buf = *arr.get();
+        getQueue().enqueueReadBuffer(buf, CL_TRUE, 0,
+                                     sizeof(T) * arr.elements(),
+                                     mapped_migrated_buffer);
+        setDevice(cur_id);
+        getQueue().enqueueUnmapMemObject(*migrated_data,
+                                         mapped_migrated_buffer);
+        arr.data.reset(migrated_data.release(), bufferFree);
+        arr.setId(cur_id);
     }
 }
 
@@ -293,14 +324,21 @@ Node_ptr Array<T>::getNode() const {
 /// 2. The number of parameters we are passing into the kernel exceeds the
 ///    limitation on the platform. For NVIDIA this is 4096 bytes. The
 template<typename T>
-kJITHeuristics passesJitHeuristics(Node *root_node) {
+kJITHeuristics passesJitHeuristics(span<Node *> root_nodes) {
     if (!evalFlag()) { return kJITHeuristics::Pass; }
-    if (root_node->getHeight() > static_cast<int>(getMaxJitSize())) {
-        return kJITHeuristics::TreeHeight;
+    static auto getLogger = [&] { return common::loggerFactory("jit"); };
+    for (const Node *n : root_nodes) {
+        if (n->getHeight() > static_cast<int>(getMaxJitSize())) {
+            AF_TRACE(
+                "JIT tree evaluated because of tree height exceeds limit: {} > "
+                "{}",
+                n->getHeight(), getMaxJitSize());
+            return kJITHeuristics::TreeHeight;
+        }
     }
 
     bool isBufferLimit = getMemoryPressure() >= getMemoryPressureThreshold();
-    auto platform      = getActivePlatform();
+    auto platform      = getActivePlatformVendor();
 
     // The Apple platform can have the nvidia card or the AMD card
     bool isIntel = platform == AFCL_PLATFORM_INTEL;
@@ -312,19 +350,30 @@ kJITHeuristics passesJitHeuristics(Node *root_node) {
 
     // A lightweight check based on the height of the node. This is
     // an inexpensive operation and does not traverse the JIT tree.
-    bool isParamLimit = (root_node->getHeight() >= heightCheckLimit);
-    if (isParamLimit || isBufferLimit) {
+    bool atHeightLimit =
+        std::any_of(std::begin(root_nodes), std::end(root_nodes),
+                    [heightCheckLimit](Node *n) {
+                        return (n->getHeight() + 1 >= heightCheckLimit);
+                    });
+
+    if (atHeightLimit || isBufferLimit) {
         // This is the base parameter size if the kernel had no
         // arguments
-        constexpr size_t base_param_size =
-            sizeof(T *) + sizeof(KParam) + (3 * sizeof(uint));
+        size_t base_param_size =
+            (sizeof(T *) + sizeof(KParam)) * root_nodes.size() +
+            (3 * sizeof(uint));
 
         const cl::Device &device = getDevice();
-        size_t max_param_size = device.getInfo<CL_DEVICE_MAX_PARAMETER_SIZE>();
         // typical values:
         //   NVIDIA     = 4096
         //   AMD        = 3520  (AMD A10 iGPU = 1024)
         //   Intel iGPU = 1024
+        //
+        // Setting the maximum to 5120 bytes to keep the compile times
+        // resonable. This still results in large kernels but its not excessive.
+        size_t max_param_size =
+            min(static_cast<cl::size_type>(5120),
+                device.getInfo<CL_DEVICE_MAX_PARAMETER_SIZE>());
         max_param_size -= base_param_size;
 
         struct tree_info {
@@ -332,31 +381,43 @@ kJITHeuristics passesJitHeuristics(Node *root_node) {
             size_t num_buffers;
             size_t param_scalar_size;
         };
-        NodeIterator<> it(root_node);
-        tree_info info =
-            accumulate(it, NodeIterator<>(), tree_info{0, 0, 0},
-                       [](tree_info &prev, Node &n) {
-                           if (n.isBuffer()) {
-                               auto &buf_node = static_cast<BufferNode &>(n);
-                               // getBytes returns the size of the data Array.
-                               // Sub arrays will be represented by their parent
-                               // size.
-                               prev.total_buffer_size += buf_node.getBytes();
-                               prev.num_buffers++;
-                           } else {
-                               prev.param_scalar_size += n.getParamBytes();
-                           }
-                           return prev;
-                       });
+
+        tree_info info{0, 0, 0};
+        for (Node *n : root_nodes) {
+            NodeIterator<> it(n);
+            info = accumulate(
+                it, NodeIterator<>(), info, [](tree_info &prev, Node &n) {
+                    if (n.isBuffer()) {
+                        auto &buf_node = static_cast<BufferNode &>(n);
+                        // getBytes returns the size of the data Array.
+                        // Sub arrays will be represented by their parent
+                        // size.
+                        prev.total_buffer_size += buf_node.getBytes();
+                        prev.num_buffers++;
+                    } else {
+                        prev.param_scalar_size += n.getParamBytes();
+                    }
+                    return prev;
+                });
+        }
         isBufferLimit = jitTreeExceedsMemoryPressure(info.total_buffer_size);
 
         size_t param_size = (info.num_buffers * (sizeof(KParam) + sizeof(T *)) +
                              info.param_scalar_size);
 
-        isParamLimit = param_size >= max_param_size;
+        bool isParamLimit = param_size >= max_param_size;
 
-        if (isParamLimit) { return kJITHeuristics::KernelParameterSize; }
-        if (isBufferLimit) { return kJITHeuristics::MemoryPressure; }
+        if (isParamLimit) {
+            AF_TRACE(
+                "JIT tree evaluated because of kernel parameter size: {} >= {}",
+                param_size, max_param_size);
+            return kJITHeuristics::KernelParameterSize;
+        }
+        if (isBufferLimit) {
+            AF_TRACE("JIT tree evaluated because of memory pressure: {}",
+                     info.total_buffer_size);
+            return kJITHeuristics::MemoryPressure;
+        }
     }
     return kJITHeuristics::Pass;
 }
@@ -418,11 +479,9 @@ Array<T> createHostDataArray(const dim4 &dims, const T *const data) {
 }
 
 template<typename T>
-Array<T> createDeviceDataArray(const dim4 &dims, void *data) {
+Array<T> createDeviceDataArray(const dim4 &dims, void *data, bool copy) {
     verifyTypeSupport<T>();
-
-    bool copy_device = false;
-    return Array<T>(dims, static_cast<cl_mem>(data), 0, copy_device);
+    return Array<T>(dims, static_cast<cl_mem>(data), 0, copy);
 }
 
 template<typename T>
@@ -490,7 +549,8 @@ size_t Array<T>::getAllocatedBytes() const {
 #define INSTANTIATE(T)                                                        \
     template Array<T> createHostDataArray<T>(const dim4 &dims,                \
                                              const T *const data);            \
-    template Array<T> createDeviceDataArray<T>(const dim4 &dims, void *data); \
+    template Array<T> createDeviceDataArray<T>(const dim4 &dims, void *data,  \
+                                               bool copy);                    \
     template Array<T> createValueArray<T>(const dim4 &dims, const T &value);  \
     template Array<T> createEmptyArray<T>(const dim4 &dims);                  \
     template Array<T> createParamArray<T>(Param & tmp, bool owner);           \
@@ -513,10 +573,11 @@ size_t Array<T>::getAllocatedBytes() const {
     template void writeDeviceDataArray<T>(                                    \
         Array<T> & arr, const void *const data, const size_t bytes);          \
     template void evalMultiple<T>(vector<Array<T> *> arrays);                 \
-    template kJITHeuristics passesJitHeuristics<T>(Node * node);              \
+    template kJITHeuristics passesJitHeuristics<T>(span<Node *> node);        \
     template void *getDevicePtr<T>(const Array<T> &arr);                      \
     template void Array<T>::setDataDims(const dim4 &new_dims);                \
-    template size_t Array<T>::getAllocatedBytes() const;
+    template size_t Array<T>::getAllocatedBytes() const;                      \
+    template void checkAndMigrate<T>(Array<T> & arr);
 
 INSTANTIATE(float)
 INSTANTIATE(double)
@@ -524,6 +585,7 @@ INSTANTIATE(cfloat)
 INSTANTIATE(cdouble)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(intl)
@@ -533,3 +595,4 @@ INSTANTIATE(ushort)
 INSTANTIATE(half)
 
 }  // namespace opencl
+}  // namespace arrayfire

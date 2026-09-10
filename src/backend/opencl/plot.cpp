@@ -14,12 +14,15 @@
 #include <plot.hpp>
 
 using af::dim4;
+using arrayfire::common::ForgeModule;
+using arrayfire::common::forgePlugin;
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T>
 void copy_plot(const Array<T> &P, fg_plot plot) {
-    ForgeModule &_ = graphics::forgePlugin();
+    ForgeModule &_ = forgePlugin();
     if (isGLSharingSupported()) {
         CheckGL("Begin OpenCL resource copy");
         const cl::Buffer *d_P = P.get();
@@ -72,6 +75,8 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 
 }  // namespace opencl
+}  // namespace arrayfire

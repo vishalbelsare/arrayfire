@@ -31,11 +31,12 @@ class CorrelationCoefficient : public ::testing::Test {
 };
 
 // create a list of types to be tested
-typedef ::testing::Types<float, double, int, uint, intl, uintl, char, uchar>
+typedef ::testing::Types<float, double, int, uint, intl, uintl, char, schar,
+                         uchar>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(CorrelationCoefficient, TestTypes);
+TYPED_TEST_SUITE(CorrelationCoefficient, TestTypes);
 
 template<typename T>
 struct f32HelperType {
@@ -61,9 +62,9 @@ template<typename T>
 struct ccOutType {
     typedef typename cond_type<
         is_same_type<T, float>::value || is_same_type<T, int>::value ||
-            is_same_type<T, uint>::value || is_same_type<T, uchar>::value ||
-            is_same_type<T, short>::value || is_same_type<T, ushort>::value ||
-            is_same_type<T, char>::value,
+            is_same_type<T, uint>::value || is_same_type<T, schar>::value ||
+            is_same_type<T, uchar>::value || is_same_type<T, short>::value ||
+            is_same_type<T, ushort>::value || is_same_type<T, char>::value,
         float, typename elseType<T>::type>::type type;
 };
 
@@ -73,8 +74,8 @@ TYPED_TEST(CorrelationCoefficient, All) {
     SUPPORTED_TYPE_CHECK(outType);
 
     vector<dim4> numDims;
-    vector<vector<int> > in;
-    vector<vector<float> > tests;
+    vector<vector<int>> in;
+    vector<vector<float>> tests;
 
     readTestsFromFile<int, float>(
         string(TEST_DIR "/corrcoef/mat_10x10_scalar.test"), numDims, in, tests);

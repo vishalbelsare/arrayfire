@@ -9,10 +9,12 @@
 
 #include <kernel/sort_by_key_impl.hpp>
 
-// SBK_TYPES:float double int uint intl uintl short ushort char uchar
+// SBK_TYPES:float double int uint intl uintl short ushort char schar uchar
 
+namespace arrayfire {
 namespace cpu {
 namespace kernel {
 INSTANTIATE1(TYPE)
 }  // namespace kernel
 }  // namespace cpu
+}  // namespace arrayfire

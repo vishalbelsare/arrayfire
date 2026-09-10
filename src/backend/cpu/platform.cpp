@@ -7,12 +7,12 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
+#include <build_version.hpp>
 #include <common/MemoryManagerBase.hpp>
 #include <common/defines.hpp>
 #include <common/host_memory.hpp>
 #include <device_manager.hpp>
 #include <platform.hpp>
-#include <version.hpp>
 #include <af/version.h>
 
 #include <cctype>
@@ -21,15 +21,17 @@
 #include <sstream>
 #include <string>
 
-using common::memory::MemoryManagerBase;
+using arrayfire::common::ForgeManager;
+using arrayfire::common::getEnvVar;
+using arrayfire::common::ltrim;
+using arrayfire::common::MemoryManagerBase;
 using std::endl;
-using std::not1;
 using std::ostringstream;
-using std::ptr_fun;
 using std::stoi;
 using std::string;
 using std::unique_ptr;
 
+namespace arrayfire {
 namespace cpu {
 
 static string get_system() {
@@ -43,14 +45,6 @@ static string get_system() {
 #elif defined(OS_MAC)
            "Mac OSX";
 #endif
-}
-
-// http://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring/217605#217605
-// trim from start
-static inline string& ltrim(string& s) {
-    s.erase(s.begin(),
-            find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
-    return s;
 }
 
 int getBackend() { return AF_BACKEND_CPU; }
@@ -122,6 +116,11 @@ int& getMaxJitSize() {
 
 int getDeviceCount() { return DeviceManager::NUM_DEVICES; }
 
+void init() {
+    thread_local const auto& instance = DeviceManager::getInstance();
+    UNUSED(instance);
+}
+
 // Get the currently active device id
 unsigned getActiveDeviceId() { return DeviceManager::ACTIVE_DEVICE_ID; }
 
@@ -148,6 +147,8 @@ int setDevice(int device) {
 queue& getQueue(int device) {
     return DeviceManager::getInstance().queues[device];
 }
+
+queue* getQueueHandle(int device) { return &getQueue(device); }
 
 void sync(int device) { getQueue(device).sync(); }
 
@@ -177,8 +178,7 @@ void resetMemoryManagerPinned() {
     return DeviceManager::getInstance().resetMemoryManagerPinned();
 }
 
-graphics::ForgeManager& forgeManager() {
-    return *(DeviceManager::getInstance().fgMngr);
-}
+ForgeManager& forgeManager() { return *(DeviceManager::getInstance().fgMngr); }
 
 }  // namespace cpu
+}  // namespace arrayfire

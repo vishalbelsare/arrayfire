@@ -19,8 +19,9 @@
 #include <complex>
 
 using af::dim4;
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cuda {
 
 template<af_op_t op, typename T>
@@ -61,6 +62,7 @@ INSTANTIATE(af_min_t, uintl)
 INSTANTIATE(af_min_t, short)
 INSTANTIATE(af_min_t, ushort)
 INSTANTIATE(af_min_t, char)
+INSTANTIATE(af_min_t, schar)
 INSTANTIATE(af_min_t, uchar)
 INSTANTIATE(af_min_t, half)
 
@@ -76,6 +78,8 @@ INSTANTIATE(af_max_t, uintl)
 INSTANTIATE(af_max_t, short)
 INSTANTIATE(af_max_t, ushort)
 INSTANTIATE(af_max_t, char)
+INSTANTIATE(af_max_t, schar)
 INSTANTIATE(af_max_t, uchar)
 INSTANTIATE(af_max_t, half)
 }  // namespace cuda
+}  // namespace arrayfire

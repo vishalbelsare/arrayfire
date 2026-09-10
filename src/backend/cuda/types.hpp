@@ -13,9 +13,11 @@
 #include <cuComplex.h>
 #include <cuda_fp16.h>
 
+namespace arrayfire {
 namespace common {
 class half;
-}
+}  // namespace common
+}  // namespace arrayfire
 
 #ifdef __CUDACC_RTC__
 
@@ -27,11 +29,13 @@ using dim_t = long long;
 
 #endif  //__CUDACC_RTC__
 
+namespace arrayfire {
 namespace cuda {
 
 using cdouble = cuDoubleComplex;
 using cfloat  = cuFloatComplex;
 using intl    = long long;
+using schar   = signed char;
 using uchar   = unsigned char;
 using uint    = unsigned int;
 using uintl   = unsigned long long;
@@ -79,6 +83,10 @@ inline const char *shortname<char>(bool caps) {
     return caps ? "J" : "j";
 }
 template<>
+inline const char *shortname<schar>(bool caps) {
+    return caps ? "A" : "a"; // TODO
+}
+template<>
 inline const char *shortname<uchar>(bool caps) {
     return caps ? "V" : "v";
 }
@@ -99,7 +107,7 @@ inline const char *shortname<ushort>(bool caps) {
     return caps ? "Q" : "q";
 }
 template<>
-inline const char *shortname<common::half>(bool caps) {
+inline const char *shortname<arrayfire::common::half>(bool caps) {
     return caps ? "H" : "h";
 }
 
@@ -117,6 +125,7 @@ SPECIALIZE(double)
 SPECIALIZE(cfloat)
 SPECIALIZE(cdouble)
 SPECIALIZE(char)
+SPECIALIZE(signed char)
 SPECIALIZE(unsigned char)
 SPECIALIZE(short)
 SPECIALIZE(unsigned short)
@@ -133,9 +142,7 @@ inline const char *getFullName<common::half>() {
 }  // namespace
 #endif  //__CUDACC_RTC__
 
-//#ifndef __CUDACC_RTC__
 }  // namespace cuda
-//#endif  //__CUDACC_RTC__
 
 namespace common {
 
@@ -143,8 +150,8 @@ template<typename T>
 struct kernel_type;
 
 template<>
-struct kernel_type<common::half> {
-    using data = common::half;
+struct kernel_type<arrayfire::common::half> {
+    using data = arrayfire::common::half;
 
 #ifdef __CUDA_ARCH__
 
@@ -161,8 +168,8 @@ struct kernel_type<common::half> {
     // outside of a cuda kernel use float
     using compute = float;
 
-#if defined(NVCC) || defined(__CUDACC_RTC__)
-    using native = __half;
+#if defined(__NVCC__) || defined(__CUDACC_RTC__)
+    using native  = __half;
 #else
     using native = common::half;
 #endif
@@ -170,3 +177,4 @@ struct kernel_type<common::half> {
 #endif  // __CUDA_ARCH__
 };
 }  // namespace common
+}  // namespace arrayfire

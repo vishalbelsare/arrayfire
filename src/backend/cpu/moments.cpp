@@ -14,6 +14,7 @@
 #include <queue.hpp>
 #include <af/defines.h>
 
+namespace arrayfire {
 namespace cpu {
 
 static inline unsigned bitCount(unsigned v) {
@@ -48,9 +49,11 @@ INSTANTIATE(float)
 INSTANTIATE(double)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(ushort)
 INSTANTIATE(short)
 
 }  // namespace cpu
+}  // namespace arrayfire

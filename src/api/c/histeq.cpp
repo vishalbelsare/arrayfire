@@ -12,6 +12,7 @@
 #include <common/cast.hpp>
 #include <common/err_common.hpp>
 #include <common/moddims.hpp>
+#include <copy.hpp>
 #include <handle.hpp>
 #include <lookup.hpp>
 #include <reduce.hpp>
@@ -22,15 +23,17 @@
 #include <af/index.h>
 
 using af::dim4;
-using common::cast;
-using common::modDims;
+using arrayfire::common::cast;
+using arrayfire::common::modDims;
 using detail::arithOp;
 using detail::Array;
 using detail::createValueArray;
+using detail::getScalar;
 using detail::intl;
 using detail::lookup;
 using detail::reduce_all;
 using detail::scan;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -50,8 +53,8 @@ static af_array hist_equal(const af_array& in, const af_array& hist) {
 
     Array<float> cdf = scan<af_add_t, float, float>(fHist, 0);
 
-    float minCdf = reduce_all<af_min_t, float, float>(cdf);
-    float maxCdf = reduce_all<af_max_t, float, float>(cdf);
+    float minCdf = getScalar<float>(reduce_all<af_min_t, float, float>(cdf));
+    float maxCdf = getScalar<float>(reduce_all<af_max_t, float, float>(cdf));
     float factor = static_cast<float>(grayLevels - 1) / (maxCdf - minCdf);
 
     // constant array of min value from cdf
@@ -93,6 +96,7 @@ af_err af_hist_equal(af_array* out, const af_array in, const af_array hist) {
             case u16: output = hist_equal<ushort, uint>(in, hist); break;
             case s64: output = hist_equal<intl, uint>(in, hist); break;
             case u64: output = hist_equal<uintl, uint>(in, hist); break;
+            case s8: output = hist_equal<schar, uint>(in, hist); break;
             case u8: output = hist_equal<uchar, uint>(in, hist); break;
             default: TYPE_ERROR(1, dataType);
         }

@@ -94,12 +94,12 @@ class ArrayAssign : public ::testing::Test {
 };
 
 // create a list of types to be tested
-typedef ::testing::Types<float, cdouble, cfloat, double, int, uint, char, uchar,
-                         intl, uintl, short, ushort, half_float::half>
+typedef ::testing::Types<float, cdouble, cfloat, double, int, uint, char, schar,
+                         uchar, intl, uintl, short, ushort, half_float::half>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(ArrayAssign, TestTypes);
+TYPED_TEST_SUITE(ArrayAssign, TestTypes);
 
 template<typename inType, typename outType>
 void assignTest(string pTestFile, const vector<af_seq> *seqv) {
@@ -107,8 +107,8 @@ void assignTest(string pTestFile, const vector<af_seq> *seqv) {
     SUPPORTED_TYPE_CHECK(outType);
 
     vector<dim4> numDims;
-    vector<vector<inType> > in;
-    vector<vector<outType> > tests;
+    vector<vector<inType>> in;
+    vector<vector<outType>> tests;
 
     readTests<inType, outType, int>(pTestFile, numDims, in, tests);
 
@@ -151,8 +151,8 @@ void assignTestCPP(string pTestFile, const vector<af_seq> &seqv) {
     SUPPORTED_TYPE_CHECK(T);
     try {
         vector<dim4> numDims;
-        vector<vector<T> > in;
-        vector<vector<T> > tests;
+        vector<vector<T>> in;
+        vector<vector<T>> tests;
 
         readTests<T, T, int>(pTestFile, numDims, in, tests);
 
@@ -290,8 +290,8 @@ void assignScalarCPP(string pTestFile, const vector<af_seq> &seqv) {
     SUPPORTED_TYPE_CHECK(T);
     try {
         vector<dim4> numDims;
-        vector<vector<T> > in;
-        vector<vector<T> > tests;
+        vector<vector<T>> in;
+        vector<vector<T>> tests;
 
         readTests<T, T, int>(pTestFile, numDims, in, tests);
 

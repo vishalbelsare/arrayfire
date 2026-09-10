@@ -38,11 +38,11 @@ class TransformInt : public ::testing::Test {
 };
 
 typedef ::testing::Types<float, double> TestTypes;
-typedef ::testing::Types<int, intl, uint, uintl, short, ushort, uchar>
+typedef ::testing::Types<int, intl, uint, uintl, short, ushort, schar, uchar>
     TestTypesInt;
 
-TYPED_TEST_CASE(Transform, TestTypes);
-TYPED_TEST_CASE(TransformInt, TestTypesInt);
+TYPED_TEST_SUITE(Transform, TestTypes);
+TYPED_TEST_SUITE(TransformInt, TestTypesInt);
 
 template<typename T>
 void genTestData(af_array *gold, af_array *in, af_array *transform,
@@ -62,8 +62,8 @@ void genTestData(af_array *gold, af_array *in, af_array *transform,
     dim4 objDims = inNumDims[0];
 
     vector<dim4> HNumDims;
-    vector<vector<float> > HIn;
-    vector<vector<float> > HTests;
+    vector<vector<float>> HIn;
+    vector<vector<float>> HTests;
     readTests<float, float, float>(pHomographyFile, HNumDims, HIn, HTests);
 
     dim4 HDims = HNumDims[0];
@@ -97,7 +97,7 @@ template<typename T>
 void transformTest(string pTestFile, string pHomographyFile,
                    const af_interp_type method, const bool invert) {
     SUPPORTED_TYPE_CHECK(T);
-    if (noImageIOTests()) return;
+    IMAGEIO_ENABLED_CHECK();
 
     af_array sceneArray = 0;
     af_array goldArray  = 0;
@@ -304,7 +304,7 @@ class TransformV2 : public Transform<T> {
     }
 
     void setTestData(string pTestFile, string pHomographyFile) {
-        if (noImageIOTests()) return;
+        IMAGEIO_ENABLED_CHECK();
         releaseArrays();
 
         genTestData<T>(&gold, &in, &transform, &odim0, &odim1, pTestFile,
@@ -390,7 +390,7 @@ class TransformV2 : public Transform<T> {
 
     void testSpclOutArray(TestOutputArrayType out_array_type) {
         SUPPORTED_TYPE_CHECK(T);
-        if (noImageIOTests()) return;
+        IMAGEIO_ENABLED_CHECK();
 
         af_array out = 0;
         TestOutputArrayInfo metadata(out_array_type);
@@ -403,7 +403,7 @@ class TransformV2 : public Transform<T> {
     }
 };
 
-TYPED_TEST_CASE(TransformV2, TestTypes);
+TYPED_TEST_SUITE(TransformV2, TestTypes);
 
 template<typename T>
 class TransformV2TuxNearest : public TransformV2<T> {
@@ -416,7 +416,7 @@ class TransformV2TuxNearest : public TransformV2<T> {
     }
 };
 
-TYPED_TEST_CASE(TransformV2TuxNearest, TestTypes);
+TYPED_TEST_SUITE(TransformV2TuxNearest, TestTypes);
 
 TYPED_TEST(TransformV2TuxNearest, UseNullOutputArray) {
     this->testSpclOutArray(NULL_ARRAY);
@@ -481,7 +481,7 @@ TEST_F(TransformNullArgs, V2NullTransformArray) {
 ///////////////////////////////////// CPP ////////////////////////////////
 //
 TEST(Transform, CPP) {
-    if (noImageIOTests()) return;
+    IMAGEIO_ENABLED_CHECK();
 
     vector<dim4> inDims;
     vector<string> inFiles;
@@ -489,8 +489,8 @@ TEST(Transform, CPP) {
     vector<string> goldFiles;
 
     vector<dim4> HDims;
-    vector<vector<float> > HIn;
-    vector<vector<float> > HTests;
+    vector<vector<float>> HIn;
+    vector<vector<float>> HTests;
     readTests<float, float, float>(TEST_DIR "/transform/tux_tmat.test", HDims,
                                    HIn, HTests);
 
@@ -543,8 +543,8 @@ TEST(Transform, CPP) {
 // This test simply makes sure the batching is working correctly
 TEST(TransformBatching, CPP) {
     vector<dim4> vDims;
-    vector<vector<float> > in;
-    vector<vector<float> > gold;
+    vector<vector<float>> in;
+    vector<vector<float>> gold;
 
     readTests<float, float, int>(
         string(TEST_DIR "/transform/transform_batching.test"), vDims, in, gold);
@@ -620,3 +620,43 @@ TEST(TransformBatching, CPP) {
         }
     }
 }
+
+#define TEST_TEMP_FORMAT(form, interp)                                         \
+    TEST(TEMP_FORMAT, form##_##interp) {                                       \
+        IMAGEIO_ENABLED_CHECK();                                               \
+                                                                               \
+        vector<dim4> inDims;                                                   \
+        vector<string> inFiles;                                                \
+        vector<dim_t> goldDim;                                                 \
+        vector<string> goldFiles;                                              \
+                                                                               \
+        vector<dim4> HDims;                                                    \
+        vector<vector<float>> HIn;                                             \
+        vector<vector<float>> HTests;                                          \
+        readTests<float, float, float>(TEST_DIR "/transform/tux_tmat.test",    \
+                                       HDims, HIn, HTests);                    \
+                                                                               \
+        readImageTests(string(TEST_DIR "/transform/tux_nearest.test"), inDims, \
+                       inFiles, goldDim, goldFiles);                           \
+        inFiles[1].insert(0, string(TEST_DIR "/transform/"));                  \
+        const array IH = array(HDims[0][0], HDims[0][1], &(HIn[0].front()));   \
+        const array scene_img = loadImage(inFiles[1].c_str(), false);          \
+                                                                               \
+        const array out =                                                      \
+            transform(toTempFormat(form, scene_img), toTempFormat(form, IH),   \
+                      inDims[0][0], inDims[0][1], interp, false);              \
+        const array gold = transform(scene_img, IH, inDims[0][0],              \
+                                     inDims[0][1], interp, false);             \
+                                                                               \
+        EXPECT_ARRAYS_EQ(out, gold);                                           \
+    }
+
+#define TESTS_TEMP_FORMAT(form)                       \
+    TEST_TEMP_FORMAT(form, AF_INTERP_NEAREST)         \
+    TEST_TEMP_FORMAT(form, AF_INTERP_BILINEAR)        \
+    TEST_TEMP_FORMAT(form, AF_INTERP_BILINEAR_COSINE) \
+    TEST_TEMP_FORMAT(form, AF_INTERP_BICUBIC)         \
+    TEST_TEMP_FORMAT(form, AF_INTERP_BICUBIC_SPLINE)  \
+    TEST_TEMP_FORMAT(form, AF_INTERP_LOWER)
+
+FOREACH_TEMP_FORMAT(TESTS_TEMP_FORMAT)

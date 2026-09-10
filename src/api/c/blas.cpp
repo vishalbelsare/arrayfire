@@ -25,13 +25,17 @@
 #include <af/defines.h>
 #include <af/dim4.hpp>
 
-using common::half;
-using common::SparseArrayBase;
+using arrayfire::getSparseArray;
+using arrayfire::getSparseArrayBase;
+using arrayfire::common::half;
+using arrayfire::common::SparseArrayBase;
 using detail::cdouble;
 using detail::cfloat;
 using detail::gemm;
 using detail::matmul;
+using detail::schar;
 
+namespace {
 template<typename T>
 static inline af_array sparseMatmul(const af_array lhs, const af_array rhs,
                                     af_mat_prop optLhs, af_mat_prop optRhs) {
@@ -39,12 +43,12 @@ static inline af_array sparseMatmul(const af_array lhs, const af_array rhs,
         matmul<T>(getSparseArray<T>(lhs), getArray<T>(rhs), optLhs, optRhs));
 }
 
-template<typename T>
+template<typename Ti, typename To = Ti>
 static inline void gemm(af_array *out, af_mat_prop optLhs, af_mat_prop optRhs,
-                        const T *alpha, const af_array lhs, const af_array rhs,
-                        const T *betas) {
-    gemm<T>(getArray<T>(*out), optLhs, optRhs, alpha, getArray<T>(lhs),
-            getArray<T>(rhs), betas);
+                        const To *alpha, const af_array lhs, const af_array rhs,
+                        const To *betas) {
+    gemm<Ti, To>(getArray<To>(*out), optLhs, optRhs, alpha, getArray<Ti>(lhs),
+                 getArray<Ti>(rhs), betas);
 }
 
 template<typename T>
@@ -53,6 +57,16 @@ static inline af_array dot(const af_array lhs, const af_array rhs,
     return getHandle(
         dot<T>(getArray<T>(lhs), getArray<T>(rhs), optLhs, optRhs));
 }
+
+template<typename T>
+static inline T dotAll(af_array out) {
+    T res{};
+    AF_CHECK(af_eval(out));
+    AF_CHECK(af_get_data_ptr((void *)&res, out));
+    return res;
+}
+
+}  // namespace
 
 af_err af_sparse_matmul(af_array *out, const af_array lhs, const af_array rhs,
                         const af_mat_prop optLhs, const af_mat_prop optRhs) {
@@ -121,8 +135,8 @@ af_err af_gemm(af_array *out, const af_mat_prop optLhs,
                const af_mat_prop optRhs, const void *alpha, const af_array lhs,
                const af_array rhs, const void *beta) {
     try {
-        const ArrayInfo &lhsInfo = getInfo(lhs, false, true);
-        const ArrayInfo &rhsInfo = getInfo(rhs, true, true);
+        const ArrayInfo &lhsInfo = getInfo(lhs, false);
+        const ArrayInfo &rhsInfo = getInfo(rhs, true);
 
         af_dtype lhs_type = lhsInfo.getType();
         af_dtype rhs_type = rhsInfo.getType();
@@ -165,6 +179,8 @@ af_err af_gemm(af_array *out, const af_mat_prop optLhs,
         if (*out) {
             output = *out;
         } else {
+            af_dtype out_type = (lhs_type != s8) ? lhs_type : f32;
+
             const int aRowDim    = (optLhs == AF_MAT_NONE) ? 0 : 1;
             const int bColDim    = (optRhs == AF_MAT_NONE) ? 1 : 0;
             const int M          = lDims[aRowDim];
@@ -173,7 +189,7 @@ af_err af_gemm(af_array *out, const af_mat_prop optLhs,
             const dim_t d3       = std::max(lDims[3], rDims[3]);
             const af::dim4 oDims = af::dim4(M, N, d2, d3);
             AF_CHECK(af_create_handle(&output, lhsInfo.ndims(), oDims.get(),
-                                      lhs_type));
+                                      out_type));
         }
 
         switch (lhs_type) {
@@ -202,6 +218,11 @@ af_err af_gemm(af_array *out, const af_mat_prop optLhs,
                            static_cast<const half *>(alpha), lhs, rhs,
                            static_cast<const half *>(beta));
                 break;
+            case s8:
+                gemm<schar, float>(&output, optLhs, optRhs,
+                                   static_cast<const float *>(alpha), lhs, rhs,
+                                   static_cast<const float *>(beta));
+                break;
             default: TYPE_ERROR(3, lhs_type);
         }
 
@@ -214,8 +235,8 @@ af_err af_gemm(af_array *out, const af_mat_prop optLhs,
 af_err af_matmul(af_array *out, const af_array lhs, const af_array rhs,
                  const af_mat_prop optLhs, const af_mat_prop optRhs) {
     try {
-        const ArrayInfo &lhsInfo = getInfo(lhs, false, true);
-        const ArrayInfo &rhsInfo = getInfo(rhs, true, true);
+        const ArrayInfo &lhsInfo = getInfo(lhs, false);
+        const ArrayInfo &rhsInfo = getInfo(rhs, true);
 
         if (lhsInfo.isSparse()) {
             return af_sparse_matmul(out, lhs, rhs, optLhs, optRhs);
@@ -233,11 +254,13 @@ af_err af_matmul(af_array *out, const af_array lhs, const af_array rhs,
         const dim_t d3       = std::max(lDims[3], rDims[3]);
         const af::dim4 oDims = af::dim4(M, N, d2, d3);
 
-        af_array gemm_out = 0;
-        AF_CHECK(af_create_handle(&gemm_out, oDims.ndims(), oDims.get(),
-                                  lhsInfo.getType()));
-
         af_dtype lhs_type = lhsInfo.getType();
+
+        af_array gemm_out      = 0;
+        af_dtype gemm_out_type = (lhs_type != s8) ? lhs_type : f32;
+        AF_CHECK(af_create_handle(&gemm_out, oDims.ndims(), oDims.get(),
+                                  gemm_out_type));
+
         switch (lhs_type) {
             case f16: {
                 static const half alpha(1.0f);
@@ -254,8 +277,8 @@ af_err af_matmul(af_array *out, const af_array lhs, const af_array rhs,
                 break;
             }
             case c32: {
-                cfloat alpha = {1.f, 0.f};
-                cfloat beta  = {0.f, 0.f};
+                cfloat alpha{1.f, 0.f};
+                cfloat beta{0.f, 0.f};
 
                 AF_CHECK(af_gemm(&gemm_out, optLhs, optRhs, &alpha, lhs, rhs,
                                  &beta));
@@ -269,8 +292,15 @@ af_err af_matmul(af_array *out, const af_array lhs, const af_array rhs,
                 break;
             }
             case c64: {
-                cdouble alpha = {1.0, 0.0};
-                cdouble beta  = {0.0, 0.0};
+                cdouble alpha{1.0, 0.0};
+                cdouble beta{0.0, 0.0};
+                AF_CHECK(af_gemm(&gemm_out, optLhs, optRhs, &alpha, lhs, rhs,
+                                 &beta));
+                break;
+            }
+            case s8: {
+                float alpha = 1.0;
+                float beta  = 0.0;
                 AF_CHECK(af_gemm(&gemm_out, optLhs, optRhs, &alpha, lhs, rhs,
                                  &beta));
                 break;
@@ -325,14 +355,6 @@ af_err af_dot(af_array *out, const af_array lhs, const af_array rhs,
     }
     CATCHALL;
     return AF_SUCCESS;
-}
-
-template<typename T>
-static inline T dotAll(af_array out) {
-    T res{};
-    AF_CHECK(af_eval(out));
-    AF_CHECK(af_get_data_ptr((void *)&res, out));
-    return res;
 }
 
 af_err af_dot_all(double *rval, double *ival, const af_array lhs,

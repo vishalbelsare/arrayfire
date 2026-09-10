@@ -26,7 +26,7 @@
 #include <utility>
 
 using af::dim4;
-using common::half;
+using arrayfire::common::half;
 using detail::cdouble;
 using detail::cfloat;
 using detail::createDeviceDataArray;
@@ -42,6 +42,7 @@ using detail::memUnlock;
 using detail::pinnedAlloc;
 using detail::pinnedFree;
 using detail::printMemInfo;
+using detail::schar;
 using detail::signalMemoryCleanup;
 using detail::uchar;
 using detail::uint;
@@ -95,6 +96,9 @@ af_err af_device_array(af_array *arr, void *data, const unsigned ndims,
             case u16:
                 res = getHandle(createDeviceDataArray<ushort>(d, data));
                 break;
+            case s8:
+                res = getHandle(createDeviceDataArray<schar>(d, data));
+                break;
             case u8:
                 res = getHandle(createDeviceDataArray<uchar>(d, data));
                 break;
@@ -130,6 +134,7 @@ af_err af_get_device_ptr(void **data, const af_array arr) {
             case u64: *data = getDevicePtr(getArray<uintl>(arr)); break;
             case s16: *data = getDevicePtr(getArray<short>(arr)); break;
             case u16: *data = getDevicePtr(getArray<ushort>(arr)); break;
+            case s8: *data = getDevicePtr(getArray<schar>(arr)); break;
             case u8: *data = getDevicePtr(getArray<uchar>(arr)); break;
             case b8: *data = getDevicePtr(getArray<char>(arr)); break;
             case f16: *data = getDevicePtr(getArray<half>(arr)); break;
@@ -144,10 +149,7 @@ af_err af_get_device_ptr(void **data, const af_array arr) {
 
 template<typename T>
 inline void lockArray(const af_array arr) {
-    // Ideally we need to use .get(false), i.e. get ptr without offset
-    // This is however not supported in opencl
-    // Use getData().get() as alternative
-    memLock(getArray<T>(arr).getData().get());
+    memLock(getArray<T>(arr).get());
 }
 
 af_err af_lock_device_ptr(const af_array arr) { return af_lock_array(arr); }
@@ -167,6 +169,7 @@ af_err af_lock_array(const af_array arr) {
             case u64: lockArray<uintl>(arr); break;
             case s16: lockArray<short>(arr); break;
             case u16: lockArray<ushort>(arr); break;
+            case s8: lockArray<schar>(arr); break;
             case u8: lockArray<uchar>(arr); break;
             case b8: lockArray<char>(arr); break;
             case f16: lockArray<half>(arr); break;
@@ -180,10 +183,8 @@ af_err af_lock_array(const af_array arr) {
 
 template<typename T>
 inline bool checkUserLock(const af_array arr) {
-    // Ideally we need to use .get(false), i.e. get ptr without offset
-    // This is however not supported in opencl
-    // Use getData().get() as alternative
-    return isLocked(static_cast<void *>(getArray<T>(arr).getData().get()));
+    detail::Array<T> &out = const_cast<detail::Array<T> &>(getArray<T>(arr));
+    return isLocked(static_cast<void *>(out.get()));
 }
 
 af_err af_is_locked_array(bool *res, const af_array arr) {
@@ -201,6 +202,7 @@ af_err af_is_locked_array(bool *res, const af_array arr) {
             case u64: *res = checkUserLock<uintl>(arr); break;
             case s16: *res = checkUserLock<short>(arr); break;
             case u16: *res = checkUserLock<ushort>(arr); break;
+            case s8: *res = checkUserLock<schar>(arr); break;
             case u8: *res = checkUserLock<uchar>(arr); break;
             case b8: *res = checkUserLock<char>(arr); break;
             case f16: *res = checkUserLock<half>(arr); break;
@@ -214,10 +216,7 @@ af_err af_is_locked_array(bool *res, const af_array arr) {
 
 template<typename T>
 inline void unlockArray(const af_array arr) {
-    // Ideally we need to use .get(false), i.e. get ptr without offset
-    // This is however not supported in opencl
-    // Use getData().get() as alternative
-    memUnlock(getArray<T>(arr).getData().get());
+    memUnlock(getArray<T>(arr).get());
 }
 
 af_err af_unlock_device_ptr(const af_array arr) { return af_unlock_array(arr); }
@@ -237,6 +236,7 @@ af_err af_unlock_array(const af_array arr) {
             case u64: unlockArray<uintl>(arr); break;
             case s16: unlockArray<short>(arr); break;
             case u16: unlockArray<ushort>(arr); break;
+            case s8: unlockArray<schar>(arr); break;
             case u8: unlockArray<uchar>(arr); break;
             case b8: unlockArray<char>(arr); break;
             case f16: unlockArray<half>(arr); break;
@@ -308,7 +308,7 @@ af_err af_free_device_v2(void *ptr) {
 
 af_err af_free_pinned(void *ptr) {
     try {
-        pinnedFree<char>(static_cast<char *>(ptr));
+        pinnedFree(ptr);
     }
     CATCHALL;
     return AF_SUCCESS;

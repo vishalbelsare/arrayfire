@@ -42,7 +42,7 @@ string getTypeName(
     return info.param.name;
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Types, ArrayIOType,
     ::testing::Values(type_params("f32", f32, 3.14f, 0),
                       type_params("f64", f64, 3.14, 0),
@@ -51,11 +51,13 @@ INSTANTIATE_TEST_CASE_P(
                       type_params("s32", s32, 11), type_params("u32", u32, 12),
                       type_params("u8", u8, 13), type_params("b8", b8, 1),
                       type_params("s64", s64, 15), type_params("u64", u64, 16),
-                      type_params("s16", s16, 17), type_params("u16", u16, 18)),
+                      type_params("s16", s16, 17), type_params("u16", u16, 18),
+                      type_params("s8", s8, 19)),
     getTypeName);
 
 TEST_P(ArrayIOType, ReadType) {
     type_params p = GetParam();
+    if (noDoubleTests(p.type)) GTEST_SKIP() << "No double support.";
     array arr =
         readArray((string(TEST_DIR) + "/arrayio/" + p.name + ".arr").c_str(),
                   p.name.c_str());
@@ -65,6 +67,7 @@ TEST_P(ArrayIOType, ReadType) {
 
 TEST_P(ArrayIOType, ReadSize) {
     type_params p = GetParam();
+    if (noDoubleTests(p.type)) GTEST_SKIP() << "No double support.";
     array arr =
         readArray((string(TEST_DIR) + "/arrayio/" + p.name + ".arr").c_str(),
                   p.name.c_str());
@@ -89,6 +92,7 @@ void checkVals(array arr, double r, double i, af_dtype t) {
 
 TEST_P(ArrayIOType, ReadContent) {
     type_params p = GetParam();
+    if (noDoubleTests(p.type)) GTEST_SKIP() << "No double support.";
     array arr =
         readArray((string(TEST_DIR) + "/arrayio/" + p.name + ".arr").c_str(),
                   p.name.c_str());
@@ -100,6 +104,7 @@ TEST_P(ArrayIOType, ReadContent) {
         case c64: checkVals<af::cdouble>(arr, p.real, p.imag, p.type); break;
         case s32: checkVals<int>(arr, p.real, p.imag, p.type); break;
         case u32: checkVals<unsigned>(arr, p.real, p.imag, p.type); break;
+        case s8: checkVals<signed char>(arr, p.real, p.imag, p.type); break;
         case u8: checkVals<unsigned char>(arr, p.real, p.imag, p.type); break;
         case b8: checkVals<char>(arr, p.real, p.imag, p.type); break;
         case s64: checkVals<long long>(arr, p.real, p.imag, p.type); break;

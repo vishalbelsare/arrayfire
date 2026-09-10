@@ -25,6 +25,7 @@ using af::dim4;
 using std::array;
 using std::ceil;
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T, typename convT>
@@ -206,6 +207,7 @@ INSTANTIATE(double)
 INSTANTIATE(float)
 INSTANTIATE(uint)
 INSTANTIATE(int)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(uintl)
@@ -214,3 +216,4 @@ INSTANTIATE(ushort)
 INSTANTIATE(short)
 
 }  // namespace cpu
+}  // namespace arrayfire

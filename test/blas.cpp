@@ -45,7 +45,7 @@ template<typename T>
 class MatrixMultiply : public ::testing::Test {};
 
 typedef ::testing::Types<float, double, cdouble, cfloat> TestTypes;
-TYPED_TEST_CASE(MatrixMultiply, TestTypes);
+TYPED_TEST_SUITE(MatrixMultiply, TestTypes);
 
 template<typename T, bool isBVector>
 void MatMulCheck(string TestFile) {
@@ -53,8 +53,8 @@ void MatMulCheck(string TestFile) {
 
     vector<dim4> numDims;
 
-    vector<vector<T> > hData;
-    vector<vector<T> > tests;
+    vector<vector<T>> hData;
+    vector<vector<T>> tests;
     readTests<T, T, int>(TestFile, numDims, hData, tests);
 
     af_array a, aT, b, bT;
@@ -132,8 +132,8 @@ void cppMatMulCheck(string TestFile) {
 
     vector<dim4> numDims;
 
-    vector<vector<T> > hData;
-    vector<vector<T> > tests;
+    vector<vector<T>> hData;
+    vector<vector<T>> tests;
     readTests<T, T, int>(TestFile, numDims, hData, tests);
 
     array a(numDims[0], &hData[0].front());
@@ -339,7 +339,7 @@ std::string print_blas_params(
     return ss.str();
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     LHSBroadcast, MatrixMultiplyBatch,
     ::testing::Values(
 
@@ -365,7 +365,7 @@ INSTANTIATE_TEST_CASE_P(
         ),
     print_blas_params);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     RHSBroadcast, MatrixMultiplyBatch,
     ::testing::Values(
         // clang-format off
@@ -389,7 +389,7 @@ INSTANTIATE_TEST_CASE_P(
         ),
     print_blas_params);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     SameBatch, MatrixMultiplyBatch,
     ::testing::Values(
         // clang-format off
@@ -489,6 +489,36 @@ TEST(MatrixMultiply, half) {
     {
         array C16 = matmul(A16, B16);
         ASSERT_ARRAYS_NEAR(expected16, C16, 0.000001);
+    }
+}
+
+TEST(MatrixMultiply, schar) {
+    array A8         = array(3, 3, h_lhs).as(s8);
+    array B8         = array(3, 3, h_rhs).as(s8);
+    array expected32 = array(3, 3, h_gold).as(f32);
+
+    {
+        af_array C32 = 0;
+        const float alpha32(1.0f);
+        const float beta32(0.0f);
+        af_backend backend;
+        af_get_active_backend(&backend);
+        if (backend == AF_BACKEND_CUDA) {
+            ASSERT_SUCCESS(af_gemm(&C32, AF_MAT_NONE, AF_MAT_NONE, &alpha32,
+                                   A8.get(), B8.get(), &beta32));
+        } else {
+            ASSERT_EQ(AF_ERR_TYPE,
+                      af_gemm(&C32, AF_MAT_NONE, AF_MAT_NONE, &alpha32,
+                              A8.get(), B8.get(), &beta32));
+            SUCCEED();
+            return;
+        }
+        af::array C(C32);
+        ASSERT_ARRAYS_NEAR(expected32, C, 0.00001);
+    }
+    {
+        array C32 = matmul(A8, B8);
+        ASSERT_ARRAYS_NEAR(expected32, C32, 0.00001);
     }
 }
 
@@ -609,7 +639,7 @@ string out_info(const ::testing::TestParamInfo<Gemm::ParamType> info) {
 }
 
 // clang-format off
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Square, Gemm,
     ::testing::Values(
         //          lhs_opts     rhs_opts     alpha  lhs    rhs    gold    lhs_dims    rhs_dims    out_dims    beta  out_array_type
@@ -623,7 +653,7 @@ INSTANTIATE_TEST_CASE_P(
 // clang-format on
 
 // clang-format off
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Batched, Gemm,
     ::testing::Values(
         //          lhs_opts     rhs_opts     alpha  lhs          rhs    gold          lhs_dims       rhs_dims    out_dims       beta  out_array_type
@@ -637,7 +667,7 @@ INSTANTIATE_TEST_CASE_P(
 // clang-format on
 
 // clang-format off
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     NonSquare, Gemm,
     ::testing::Values(
         //          lhs_opts      rhs_opts      alpha  lhs         rhs         gold       lhs_dims    rhs_dims    out_dims    beta  out_array_type

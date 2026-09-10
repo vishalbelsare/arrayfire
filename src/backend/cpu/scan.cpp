@@ -18,6 +18,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace cpu {
 
 template<af_op_t op, typename Ti, typename To>
@@ -83,6 +84,7 @@ Array<To> scan(const Array<Ti>& in, const int dim, bool inclusive_scan) {
     INSTANTIATE_SCAN(ROp, uintl, uintl)     \
     INSTANTIATE_SCAN(ROp, char, int)        \
     INSTANTIATE_SCAN(ROp, char, uint)       \
+    INSTANTIATE_SCAN(ROp, schar, int)       \
     INSTANTIATE_SCAN(ROp, uchar, uint)      \
     INSTANTIATE_SCAN(ROp, short, int)       \
     INSTANTIATE_SCAN(ROp, ushort, uint)
@@ -93,3 +95,4 @@ INSTANTIATE_SCAN_ALL(af_mul_t)
 INSTANTIATE_SCAN_ALL(af_min_t)
 INSTANTIATE_SCAN_ALL(af_max_t)
 }  // namespace cpu
+}  // namespace arrayfire

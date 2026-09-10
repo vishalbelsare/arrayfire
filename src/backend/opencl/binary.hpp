@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2025, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -9,7 +9,11 @@
 
 #pragma once
 #include <optypes.hpp>
+#include <common/half.hpp>
 
+using arrayfire::common::half;
+
+namespace arrayfire {
 namespace opencl {
 
 template<typename To, typename Ti, af_op_t op>
@@ -79,6 +83,11 @@ BINARY_TYPE_2(max)
 BINARY_TYPE_2(rem)
 BINARY_TYPE_2(mod)
 
+template<>
+struct BinOp<common::half, common::half, af_mod_t> {
+    const char *name() { return "fmod"; }
+};
+
 template<typename To, typename Ti>
 struct BinOp<To, Ti, af_pow_t> {
     const char *name() { return "__pow"; }
@@ -92,6 +101,7 @@ struct BinOp<To, Ti, af_pow_t> {
 
 POW_BINARY_OP(double, "pow")
 POW_BINARY_OP(float, "pow")
+POW_BINARY_OP(half, "pow")
 POW_BINARY_OP(intl, "__powll")
 POW_BINARY_OP(uintl, "__powul")
 POW_BINARY_OP(uint, "__powui")
@@ -125,3 +135,4 @@ struct BinOp<To, Ti, af_hypot_t> {
 };
 
 }  // namespace opencl
+}  // namespace arrayfire

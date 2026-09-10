@@ -20,20 +20,27 @@ using detail::createNodeArray;
 
 using std::make_shared;
 using std::shared_ptr;
+using std::array;
+using arrayfire::common::Node;
+using arrayfire::common::Node_ptr;
 using std::vector;
 
+namespace arrayfire {
 namespace common {
+
+Node_ptr copyModdims(const Node_ptr &in, const af::dim4 &newDim) {
+
+    Node_ptr out = in->clone();
+    for(int i = 0; i < in->kMaxChildren && in->m_children[i] != nullptr; ++i) {
+        out->m_children[i] = copyModdims(in->m_children[i], newDim);
+    }
+    if(out->isBuffer()) out->modDims(newDim);
+
+    return out;
+}
+
 template<typename T>
 Array<T> moddimOp(const Array<T> &in, af::dim4 outDim) {
-    using common::Node;
-    using common::Node_ptr;
-    using std::array;
-
-    auto createModdim = [outDim](array<Node_ptr, 1> &operands) {
-        return make_shared<ModdimNode>(
-            outDim, static_cast<af::dtype>(af::dtype_traits<T>::af_type),
-            operands[0]);
-    };
 
     const auto &node = in.getNode();
 
@@ -48,8 +55,9 @@ Array<T> moddimOp(const Array<T> &in, af::dim4 outDim) {
     }
     if (all_linear == false) in.eval();
 
-    Node_ptr out = createNaryNode<T, 1>(outDim, createModdim, {&in});
-    return createNodeArray<T>(outDim, out);
+    Array<T> out = createNodeArray<T>(outDim, copyModdims(in.getNode(), outDim));
+
+    return out;
 }
 
 template<typename T>
@@ -80,18 +88,20 @@ detail::Array<T> flat(const detail::Array<T> &in) {
 }
 
 }  // namespace common
+}  // namespace arrayfire
 
-#define INSTANTIATE(TYPE)                                        \
-    template detail::Array<TYPE> common::modDims<TYPE>(          \
-        const detail::Array<TYPE> &in, const af::dim4 &newDims); \
-    template detail::Array<TYPE> common::flat<TYPE>(             \
+#define INSTANTIATE(TYPE)                                          \
+    template detail::Array<TYPE> arrayfire::common::modDims<TYPE>( \
+        const detail::Array<TYPE> &in, const af::dim4 &newDims);   \
+    template detail::Array<TYPE> arrayfire::common::flat<TYPE>(    \
         const detail::Array<TYPE> &in)
 
 INSTANTIATE(float);
 INSTANTIATE(double);
 INSTANTIATE(detail::cfloat);
 INSTANTIATE(detail::cdouble);
-INSTANTIATE(common::half);
+INSTANTIATE(arrayfire::common::half);
+INSTANTIATE(signed char);
 INSTANTIATE(unsigned char);
 INSTANTIATE(char);
 INSTANTIATE(unsigned short);

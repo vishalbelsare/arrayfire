@@ -16,6 +16,8 @@
 #include <af/internal.h>
 
 #include <gtest/gtest.h>
+#include <half.hpp>
+#include <relative_difference.hpp>
 
 #include <algorithm>
 #include <cfloat>
@@ -38,6 +40,7 @@
 
 using af::af_cdouble;
 using af::af_cfloat;
+using std::vector;
 
 bool operator==(const af_half &lhs, const af_half &rhs) {
     return lhs.data_ == rhs.data_;
@@ -54,6 +57,7 @@ std::ostream &operator<<(std::ostream &os, af::Backend bk) {
         case AF_BACKEND_CPU: os << "AF_BACKEND_CPU"; break;
         case AF_BACKEND_CUDA: os << "AF_BACKEND_CUDA"; break;
         case AF_BACKEND_OPENCL: os << "AF_BACKEND_OPENCL"; break;
+        case AF_BACKEND_ONEAPI: os << "AF_BACKEND_ONEAPI"; break;
         case AF_BACKEND_DEFAULT: os << "AF_BACKEND_DEFAULT"; break;
     }
     return os;
@@ -73,6 +77,7 @@ std::ostream &operator<<(std::ostream &os, af::dtype type) {
         case b8: name = "b8"; break;
         case s32: name = "s32"; break;
         case u32: name = "u32"; break;
+        case s8: name = "s8"; break;
         case u8: name = "u8"; break;
         case s64: name = "s64"; break;
         case u64: name = "u64"; break;
@@ -96,6 +101,27 @@ std::string readNextNonEmptyLine(std::ifstream &file) {
         throw std::runtime_error("Non empty lines not found in the file");
     }
     return result;
+}
+
+std::string getBackendName(bool lower) {
+    af::Backend backend = af::getActiveBackend();
+    switch (backend) {
+        case AF_BACKEND_CPU:
+            return lower ? std::string("cpu") : std::string("CPU");
+        case AF_BACKEND_CUDA:
+            return lower ? std::string("cuda") : std::string("CUDA");
+        case AF_BACKEND_OPENCL:
+            return lower ? std::string("opencl") : std::string("OpenCL");
+        case AF_BACKEND_ONEAPI:
+            return lower ? std::string("oneapi") : std::string("oneAPI");
+        default: return lower ? std::string("unknown") : std::string("Unknown");
+    }
+}
+
+std::string getTestName() {
+    std::string testname =
+        ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    return testname;
 }
 
 namespace half_float {
@@ -142,6 +168,9 @@ std::ostream &operator<<(std::ostream &os, half_float::half val) {
         case u32:
             return elemWiseEq<uint>(aName, bName, a, b, maxAbsDiff);
             break;
+        case s8:
+            return elemWiseEq<schar>(aName, bName, a, b, maxAbsDiff);
+            break;
         case u8:
             return elemWiseEq<uchar>(aName, bName, a, b, maxAbsDiff);
             break;
@@ -159,7 +188,7 @@ std::ostream &operator<<(std::ostream &os, half_float::half val) {
             return elemWiseEq<unsigned short>(aName, bName, a, b, maxAbsDiff);
             break;
         case f16:
-            return elemWiseEq<af::half>(aName, bName, a, b, maxAbsDiff);
+            return elemWiseEq<half_float::half>(aName, bName, a, b, maxAbsDiff);
             break;
         default:
             return ::testing::AssertionFailure()
@@ -200,9 +229,9 @@ template<typename T>
         af::saveImage(result_path.c_str(), b.as(f32));
         af::saveImage(diff_path.c_str(), abs(a.as(f32) - b.as(f32)));
 
-        std::cout
-            << "<DartMeasurementFile type=\"image/png\" name=\"ValidImage\">"
-            << valid_path << "</DartMeasurementFile>\n";
+        std::cout << "<DartMeasurementFile type=\"image/png\" "
+                     "name=\"ValidImage\">"
+                  << valid_path << "</DartMeasurementFile>\n";
         std::cout
             << "<DartMeasurementFile type=\"image/png\" name=\"TestImage\">"
             << result_path << "</DartMeasurementFile>\n";
@@ -238,10 +267,19 @@ template<typename T>
                << "Expected: " << aName << "([" << a.dims() << "])";
 
     switch (arrDtype) {
+        case s8: return imageEq<signed char>(aName, bName, a, b, maxAbsDiff);
         case u8: return imageEq<unsigned char>(aName, bName, a, b, maxAbsDiff);
         case b8: return imageEq<char>(aName, bName, a, b, maxAbsDiff);
+        case s32: return imageEq<int>(aName, bName, a, b, maxAbsDiff);
+        case u32: return imageEq<unsigned int>(aName, bName, a, b, maxAbsDiff);
         case f32: return imageEq<float>(aName, bName, a, b, maxAbsDiff);
         case f64: return imageEq<double>(aName, bName, a, b, maxAbsDiff);
+        case s16: return imageEq<short>(aName, bName, a, b, maxAbsDiff);
+        case u16:
+            return imageEq<unsigned short>(aName, bName, a, b, maxAbsDiff);
+        case u64:
+            return imageEq<unsigned long long>(aName, bName, a, b, maxAbsDiff);
+        case s64: return imageEq<long long>(aName, bName, a, b, maxAbsDiff);
         default: throw(AF_ERR_NOT_SUPPORTED);
     }
     return ::testing::AssertionSuccess();
@@ -262,8 +300,8 @@ af_half convert(int in) {
 
 template<typename inType, typename outType, typename FileElementType>
 void readTests(const std::string &FileName, std::vector<af::dim4> &inputDims,
-               std::vector<std::vector<inType> > &testInputs,
-               std::vector<std::vector<outType> > &testOutputs) {
+               std::vector<std::vector<inType>> &testInputs,
+               std::vector<std::vector<outType>> &testOutputs) {
     using std::vector;
 
     std::ifstream testFile(FileName.c_str());
@@ -308,14 +346,15 @@ void readTests(const std::string &FileName, std::vector<af::dim4> &inputDims,
 #define INSTANTIATE(Tin, Tout, Tfile)                                  \
     template void readTests<Tin, Tout, Tfile>(                         \
         const std::string &FileName, std::vector<af::dim4> &inputDims, \
-        std::vector<std::vector<Tin> > &testInputs,                    \
-        std::vector<std::vector<Tout> > &testOutputs)
+        std::vector<std::vector<Tin>> &testInputs,                     \
+        std::vector<std::vector<Tout>> &testOutputs)
 
 INSTANTIATE(float, float, int);
 INSTANTIATE(double, float, int);
 INSTANTIATE(int, float, int);
 INSTANTIATE(unsigned int, float, int);
 INSTANTIATE(char, float, int);
+INSTANTIATE(signed char, float, int);
 INSTANTIATE(unsigned char, float, int);
 INSTANTIATE(short, float, int);
 INSTANTIATE(unsigned short, float, int);
@@ -330,6 +369,7 @@ INSTANTIATE(unsigned int, unsigned int, unsigned int);
 INSTANTIATE(long long, long long, int);
 INSTANTIATE(unsigned long long, unsigned long long, int);
 INSTANTIATE(char, char, int);
+INSTANTIATE(signed char, signed char, int);
 INSTANTIATE(unsigned char, unsigned char, int);
 INSTANTIATE(short, short, int);
 INSTANTIATE(unsigned short, unsigned short, int);
@@ -338,12 +378,19 @@ INSTANTIATE(af_half, af_half, int);
 INSTANTIATE(float, int, int);
 INSTANTIATE(unsigned int, int, int);
 INSTANTIATE(char, int, int);
+INSTANTIATE(signed char, int, int);
 INSTANTIATE(unsigned char, int, int);
 INSTANTIATE(short, int, int);
 INSTANTIATE(unsigned short, int, int);
 
+INSTANTIATE(signed char, unsigned short, int);
+INSTANTIATE(signed char, short, int);
+INSTANTIATE(signed char, unsigned char, int);
+INSTANTIATE(signed char, double, int);
+
 INSTANTIATE(unsigned char, unsigned short, int);
 INSTANTIATE(unsigned char, short, int);
+INSTANTIATE(unsigned char, signed char, int);
 INSTANTIATE(unsigned char, double, int);
 
 INSTANTIATE(long long, unsigned int, unsigned int);
@@ -352,6 +399,7 @@ INSTANTIATE(int, unsigned int, unsigned int);
 INSTANTIATE(short, unsigned int, unsigned int);
 INSTANTIATE(unsigned short, unsigned int, unsigned int);
 INSTANTIATE(char, unsigned int, unsigned int);
+INSTANTIATE(signed char, unsigned int, unsigned int);
 INSTANTIATE(unsigned char, unsigned int, unsigned int);
 INSTANTIATE(float, unsigned int, unsigned int);
 INSTANTIATE(double, unsigned int, unsigned int);
@@ -362,12 +410,14 @@ INSTANTIATE(int, unsigned int, int);
 INSTANTIATE(long long, unsigned int, int);
 INSTANTIATE(unsigned long long, unsigned int, int);
 INSTANTIATE(char, unsigned int, int);
+INSTANTIATE(signed char, unsigned int, int);
 INSTANTIATE(unsigned char, unsigned int, int);
 INSTANTIATE(short, unsigned int, int);
 INSTANTIATE(unsigned short, unsigned int, int);
 
 INSTANTIATE(float, char, int);
 INSTANTIATE(double, char, int);
+INSTANTIATE(signed char, char, int);
 INSTANTIATE(unsigned char, char, int);
 INSTANTIATE(short, char, int);
 INSTANTIATE(unsigned short, char, int);
@@ -378,6 +428,7 @@ INSTANTIATE(char, float, float);
 INSTANTIATE(int, float, float);
 INSTANTIATE(unsigned int, float, float);
 INSTANTIATE(short, float, float);
+INSTANTIATE(signed char, float, float);
 INSTANTIATE(unsigned char, float, float);
 INSTANTIATE(unsigned short, float, float);
 INSTANTIATE(double, float, float);
@@ -398,14 +449,29 @@ INSTANTIATE(unsigned int, unsigned int, float);
 INSTANTIATE(long long, long long, float);
 INSTANTIATE(unsigned long long, unsigned long long, float);
 INSTANTIATE(char, char, float);
+INSTANTIATE(signed char, signed char, float);
 INSTANTIATE(unsigned char, unsigned char, float);
 INSTANTIATE(short, short, float);
 INSTANTIATE(unsigned short, unsigned short, float);
 INSTANTIATE(half_float::half, half_float::half, float);
+INSTANTIATE(half_float::half, half_float::half, double);
 
+INSTANTIATE(af_cdouble, af_cdouble, double);
 INSTANTIATE(double, af_cdouble, float);
 INSTANTIATE(float, af_cfloat, float);
 INSTANTIATE(half_float::half, uint, uint);
+INSTANTIATE(float, float, double);
+INSTANTIATE(int, float, double);
+INSTANTIATE(unsigned int, float, double);
+INSTANTIATE(short, float, double);
+INSTANTIATE(unsigned short, float, double);
+INSTANTIATE(char, float, double);
+INSTANTIATE(signed char, float, double);
+INSTANTIATE(unsigned char, float, double);
+INSTANTIATE(long long, double, double);
+INSTANTIATE(unsigned long long, double, double);
+INSTANTIATE(af_cfloat, af_cfloat, double);
+INSTANTIATE(half_float::half, float, double);
 
 #undef INSTANTIATE
 
@@ -460,7 +526,8 @@ dim_t ravelIdx(af::dim4 coords, af::dim4 strides) {
                               0LL);
 }
 
-// Calculate a linearized index's multi-dimensonal coordinates in an af::array,
+// Calculate a linearized index's multi-dimensonal coordinates in an
+// af::array,
 //  given its dimension sizes and strides
 af::dim4 unravelIdx(dim_t idx, af::dim4 dims, af::dim4 strides) {
     af::dim4 coords;
@@ -501,8 +568,9 @@ std::string minimalDim4(af::dim4 coords, af::dim4 dims) {
     return os.str();
 }
 
-// Generates a random array. testWriteToOutputArray expects that it will receive
-// the same af_array that this generates after the af_* function is called
+// Generates a random array. testWriteToOutputArray expects that it will
+// receive the same af_array that this generates after the af_* function is
+// called
 void genRegularArray(TestOutputArrayInfo *metadata, const unsigned ndims,
                      const dim_t *const dims, const af_dtype ty) {
     metadata->init(ndims, dims, ty);
@@ -515,9 +583,9 @@ void genRegularArray(TestOutputArrayInfo *metadata, double val,
 }
 
 // Generates a large, random array, and extracts a subarray for the af_*
-// function to use. testWriteToOutputArray expects that the large array that it
-// receives is equal to the same large array with the gold array injected on the
-// same subarray location
+// function to use. testWriteToOutputArray expects that the large array that
+// it receives is equal to the same large array with the gold array injected
+// on the same subarray location
 void genSubArray(TestOutputArrayInfo *metadata, const unsigned ndims,
                  const dim_t *const dims, const af_dtype ty) {
     const dim_t pad_size = 2;
@@ -530,8 +598,9 @@ void genSubArray(TestOutputArrayInfo *metadata, const unsigned ndims,
     }
 
     // Calculate index of sub-array. These will be used also by
-    // testWriteToOutputArray so that the gold sub array will be placed in the
-    // same location. Currently, this location is the center of the large array
+    // testWriteToOutputArray so that the gold sub array will be placed in
+    // the same location. Currently, this location is the center of the
+    // large array
     af_seq subarr_idxs[4] = {af_span, af_span, af_span, af_span};
     for (uint i = 0; i < ndims; ++i) {
         af_seq idx     = {pad_size, pad_size + dims[i] - 1.0, 1.0};
@@ -554,8 +623,9 @@ void genSubArray(TestOutputArrayInfo *metadata, double val,
     }
 
     // Calculate index of sub-array. These will be used also by
-    // testWriteToOutputArray so that the gold sub array will be placed in the
-    // same location. Currently, this location is the center of the large array
+    // testWriteToOutputArray so that the gold sub array will be placed in
+    // the same location. Currently, this location is the center of the
+    // large array
     af_seq subarr_idxs[4] = {af_span, af_span, af_span, af_span};
     for (uint i = 0; i < ndims; ++i) {
         af_seq idx     = {pad_size, pad_size + dims[i] - 1.0, 1.0};
@@ -565,13 +635,14 @@ void genSubArray(TestOutputArrayInfo *metadata, double val,
     metadata->init(val, ndims, full_arr_dims, ty, &subarr_idxs[0]);
 }
 
-// Generates a reordered array. testWriteToOutputArray expects that this array
-// will still have the correct output values from the af_* function, even though
-// the array was initially reordered.
+// Generates a reordered array. testWriteToOutputArray expects that this
+// array will still have the correct output values from the af_* function,
+// even though the array was initially reordered.
 void genReorderedArray(TestOutputArrayInfo *metadata, const unsigned ndims,
                        const dim_t *const dims, const af_dtype ty) {
-    // The rest of this function assumes that dims has 4 elements. Just in case
-    // dims has < 4 elements, use another dims array that is filled with 1s
+    // The rest of this function assumes that dims has 4 elements. Just in
+    // case dims has < 4 elements, use another dims array that is filled
+    // with 1s
     dim_t all_dims[4] = {1, 1, 1, 1};
     for (uint i = 0; i < ndims; ++i) { all_dims[i] = dims[i]; }
 
@@ -582,7 +653,8 @@ void genReorderedArray(TestOutputArrayInfo *metadata, const unsigned ndims,
     uint reorder_idxs[4] = {0, 2, 1, 3};
 
     // Shape the output array such that the reordered output array will have
-    // the correct dimensions that the test asks for (i.e. must match dims arg)
+    // the correct dimensions that the test asks for (i.e. must match dims
+    // arg)
     dim_t init_dims[4] = {all_dims[0], all_dims[1], all_dims[2], all_dims[3]};
     for (uint i = 0; i < 4; ++i) { init_dims[i] = all_dims[reorder_idxs[i]]; }
     metadata->init(4, init_dims, ty);
@@ -597,8 +669,9 @@ void genReorderedArray(TestOutputArrayInfo *metadata, const unsigned ndims,
 void genReorderedArray(TestOutputArrayInfo *metadata, double val,
                        const unsigned ndims, const dim_t *const dims,
                        const af_dtype ty) {
-    // The rest of this function assumes that dims has 4 elements. Just in case
-    // dims has < 4 elements, use another dims array that is filled with 1s
+    // The rest of this function assumes that dims has 4 elements. Just in
+    // case dims has < 4 elements, use another dims array that is filled
+    // with 1s
     dim_t all_dims[4] = {1, 1, 1, 1};
     for (uint i = 0; i < ndims; ++i) { all_dims[i] = dims[i]; }
 
@@ -609,7 +682,8 @@ void genReorderedArray(TestOutputArrayInfo *metadata, double val,
     uint reorder_idxs[4] = {0, 2, 1, 3};
 
     // Shape the output array such that the reordered output array will have
-    // the correct dimensions that the test asks for (i.e. must match dims arg)
+    // the correct dimensions that the test asks for (i.e. must match dims
+    // arg)
     dim_t init_dims[4] = {all_dims[0], all_dims[1], all_dims[2], all_dims[3]};
     for (uint i = 0; i < 4; ++i) { init_dims[i] = all_dims[reorder_idxs[i]]; }
     metadata->init(val, 4, init_dims, ty);
@@ -679,8 +753,8 @@ void genTestOutputArray(af_array *out_ptr, double val, const unsigned ndims,
 
     if (metadata->getOutputArrayType() == SUB_ARRAY) {
         // There are two full arrays. One will be injected with the gold
-        // subarray, the other should have already been injected with the af_*
-        // function's output. Then we compare the two full arrays
+        // subarray, the other should have already been injected with the
+        // af_* function's output. Then we compare the two full arrays
         af_array gold_full_array = metadata->getFullOutputCopy();
         af_assign_seq(&gold_full_array, gold_full_array,
                       metadata->getSubArrayNumDims(),
@@ -781,23 +855,11 @@ void cleanSlate() {
     ASSERT_EQ(af::getMemStepSize(), step_bytes);
 }
 
-bool noImageIOTests() {
-    bool ret = !af::isImageIOAvailable();
-    if (ret) printf("Image IO Not Configured. Test will exit\n");
-    return ret;
-}
-
-bool noLAPACKTests() {
-    bool ret = !af::isLAPACKAvailable();
-    if (ret) printf("LAPACK Not Configured. Test will exit\n");
-    return ret;
-}
-
 template<typename inType, typename outType>
 void readTestsFromFile(const std::string &FileName,
                        std::vector<af::dim4> &inputDims,
-                       std::vector<std::vector<inType> > &testInputs,
-                       std::vector<std::vector<outType> > &testOutputs) {
+                       std::vector<std::vector<inType>> &testInputs,
+                       std::vector<std::vector<outType>> &testOutputs) {
     using std::vector;
 
     std::ifstream testFile(FileName.c_str());
@@ -845,8 +907,8 @@ void readTestsFromFile(const std::string &FileName,
 #define INSTANTIATE(Ti, To)                                            \
     template void readTestsFromFile<Ti, To>(                           \
         const std::string &FileName, std::vector<af::dim4> &inputDims, \
-        std::vector<std::vector<Ti> > &testInputs,                     \
-        std::vector<std::vector<To> > &testOutputs)
+        std::vector<std::vector<Ti>> &testInputs,                      \
+        std::vector<std::vector<To>> &testOutputs)
 
 INSTANTIATE(float, float);
 INSTANTIATE(float, af_cfloat);
@@ -862,7 +924,7 @@ template<typename outType>
 void readImageTests(const std::string &pFileName,
                     std::vector<af::dim4> &pInputDims,
                     std::vector<std::string> &pTestInputs,
-                    std::vector<std::vector<outType> > &pTestOutputs) {
+                    std::vector<std::vector<outType>> &pTestOutputs) {
     using std::vector;
 
     std::ifstream testFile(pFileName.c_str());
@@ -905,7 +967,7 @@ void readImageTests(const std::string &pFileName,
     template void readImageTests<To>(                                    \
         const std::string &pFileName, std::vector<af::dim4> &pInputDims, \
         std::vector<std::string> &pTestInputs,                           \
-        std::vector<std::vector<To> > &pTestOutputs)
+        std::vector<std::vector<To>> &pTestOutputs)
 
 INSTANTIATE(float);
 #undef INSTANTIATE
@@ -954,8 +1016,8 @@ template<typename descType>
 void readImageFeaturesDescriptors(
     const std::string &pFileName, std::vector<af::dim4> &pInputDims,
     std::vector<std::string> &pTestInputs,
-    std::vector<std::vector<float> > &pTestFeats,
-    std::vector<std::vector<descType> > &pTestDescs) {
+    std::vector<std::vector<float>> &pTestFeats,
+    std::vector<std::vector<descType>> &pTestDescs) {
     using std::vector;
 
     std::ifstream testFile(pFileName.c_str());
@@ -1007,8 +1069,8 @@ void readImageFeaturesDescriptors(
     template void readImageFeaturesDescriptors<TYPE>(                    \
         const std::string &pFileName, std::vector<af::dim4> &pInputDims, \
         std::vector<std::string> &pTestInputs,                           \
-        std::vector<std::vector<float> > &pTestFeats,                    \
-        std::vector<std::vector<TYPE> > &pTestDescs)
+        std::vector<std::vector<float>> &pTestFeats,                     \
+        std::vector<std::vector<TYPE>> &pTestDescs)
 
 INSTANTIATE(float);
 INSTANTIATE(double);
@@ -1100,7 +1162,6 @@ bool compareArraysRMSD(dim_t data_size, T *gold, T *data, double tolerance) {
 INSTANTIATE(float);
 INSTANTIATE(double);
 INSTANTIATE(char);
-INSTANTIATE(unsigned char);
 #undef INSTANTIATE
 
 TestOutputArrayInfo::TestOutputArrayInfo()
@@ -1240,9 +1301,11 @@ TestOutputArrayType TestOutputArrayInfo::getOutputArrayType() {
                 return ::testing::AssertionFailure()
                        << "\nEnd of file reached, expected more data, "
                        << "following are some reasons this happens.\n"
-                       << "\t - use of template type that doesn't match data "
+                       << "\t - use of template type that doesn't match "
+                          "data "
                           "type\n"
-                       << "\t - the mtx file itself doesn't have enough data\n";
+                       << "\t - the mtx file itself doesn't have enough "
+                          "data\n";
             }
             I[i] = r - 1;
             J[i] = c - 1;
@@ -1266,9 +1329,11 @@ TestOutputArrayType TestOutputArrayInfo::getOutputArrayType() {
                 return ::testing::AssertionFailure()
                        << "\nEnd of file reached, expected more data, "
                        << "following are some reasons this happens.\n"
-                       << "\t - use of template type that doesn't match data "
+                       << "\t - use of template type that doesn't match "
+                          "data "
                           "type\n"
-                       << "\t - the mtx file itself doesn't have enough data\n";
+                       << "\t - the mtx file itself doesn't have enough "
+                          "data\n";
             }
             I[i] = r - 1;
             J[i] = c - 1;
@@ -1304,10 +1369,17 @@ af_err conv_image(af_array *out, af_array in) {
 
     T *out_data = new T[nElems];
 
-    for (int i = 0; i < (int)nElems; i++) out_data[i] = (T)in_data[i];
+    af_dtype out_type = (af_dtype)af::dtype_traits<T>::af_type;
+    for (int i = 0; i < (int)nElems; i++) {
+        if (out_type == s8) {
+            // shift to avoid overflow
+            out_data[i] = (T)(std::trunc(in_data[i]) - 128.f);
+        } else {
+            out_data[i] = (T)in_data[i];
+        }
+    }
 
-    af_create_array(&outArray, out_data, idims.ndims(), idims.get(),
-                    (af_dtype)af::dtype_traits<T>::af_type);
+    af_create_array(&outArray, out_data, idims.ndims(), idims.get(), out_type);
 
     std::swap(*out, outArray);
 
@@ -1322,6 +1394,7 @@ af_err conv_image(af_array *out, af_array in) {
 
 INSTANTIATE(float);
 INSTANTIATE(double);
+INSTANTIATE(signed char);
 INSTANTIATE(unsigned char);
 INSTANTIATE(half_float::half);
 INSTANTIATE(unsigned int);
@@ -1349,7 +1422,8 @@ af::array cpu_randu(const af::dim4 dims) {
 
     std::vector<BT> out(elements);
     for (size_t i = 0; i < elements; i++) {
-        out[i] = isTypeFloat ? (BT)(rand()) / RAND_MAX : rand() % 100;
+        out[i] = isTypeFloat ? (BT)(rand()) / static_cast<double>(RAND_MAX)
+                             : rand() % 100;
     }
 
     return af::array(dims, (T *)&out[0]);
@@ -1358,6 +1432,7 @@ af::array cpu_randu(const af::dim4 dims) {
 #define INSTANTIATE(To) template af::array cpu_randu<To>(const af::dim4 dims)
 INSTANTIATE(float);
 INSTANTIATE(double);
+INSTANTIATE(signed char);
 INSTANTIATE(unsigned char);
 INSTANTIATE(half_float::half);
 INSTANTIATE(unsigned int);
@@ -1370,6 +1445,116 @@ INSTANTIATE(af_cfloat);
 INSTANTIATE(long long);
 INSTANTIATE(unsigned long long);
 #undef INSTANTIATE
+
+template<typename T>
+struct sparseCooValue {
+    int row = 0;
+    int col = 0;
+    T value = 0;
+    sparseCooValue(int r, int c, T v) : row(r), col(c), value(v) {}
+};
+
+template<typename T>
+void swap(sparseCooValue<T> &lhs, sparseCooValue<T> &rhs) {
+    std::swap(lhs.row, rhs.row);
+    std::swap(lhs.col, rhs.col);
+    std::swap(lhs.value, rhs.value);
+}
+
+template<typename T>
+bool operator<(const sparseCooValue<T> &lhs, const sparseCooValue<T> &rhs) {
+    if (lhs.row < rhs.row) {
+        return true;
+    } else if (lhs.row == rhs.row && lhs.col < rhs.col) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+template<typename T>
+std::ostream &operator<<(std::ostream &os, const sparseCooValue<T> &val) {
+    os << "(" << val.row << ", " << val.col << "): " << val.value;
+    return os;
+}
+
+template<typename T>
+bool isZero(const sparseCooValue<T> &val) {
+    return val.value == 0.;
+}
+
+template<typename T>
+vector<sparseCooValue<T>> toCooVector(const af::array &arr) {
+    vector<sparseCooValue<T>> out;
+    if (arr.issparse()) {
+        switch (sparseGetStorage(arr)) {
+            case AF_STORAGE_COO: {
+                dim_t nnz = sparseGetNNZ(arr);
+                vector<int> row(nnz), col(nnz);
+                vector<T> values(nnz);
+                sparseGetValues(arr).host(values.data());
+                sparseGetRowIdx(arr).host(row.data());
+                sparseGetColIdx(arr).host(col.data());
+                out.reserve(nnz);
+                for (int i = 0; i < nnz; i++) {
+                    out.emplace_back(row[i], col[i], values[i]);
+                }
+            } break;
+            case AF_STORAGE_CSR: {
+                dim_t nnz = sparseGetNNZ(arr);
+                vector<int> row(arr.dims(0) + 1), col(nnz);
+                vector<T> values(nnz);
+                sparseGetValues(arr).host(values.data());
+                sparseGetRowIdx(arr).host(row.data());
+                sparseGetColIdx(arr).host(col.data());
+                out.reserve(nnz);
+                for (int i = 0; i < row.size() - 1; i++) {
+                    for (int r = row[i]; r < row[i + 1]; r++) {
+                        out.emplace_back(i, col[r], values[r]);
+                    }
+                }
+            } break;
+            case AF_STORAGE_CSC: {
+                dim_t nnz = sparseGetNNZ(arr);
+                vector<int> row(nnz), col(arr.dims(1) + 1);
+                vector<T> values(nnz);
+                sparseGetValues(arr).host(values.data());
+                sparseGetRowIdx(arr).host(row.data());
+                sparseGetColIdx(arr).host(col.data());
+                out.reserve(nnz);
+                for (int i = 0; i < col.size() - 1; i++) {
+                    for (int c = col[i]; c < col[i + 1]; c++) {
+                        out.emplace_back(row[c], i, values[c]);
+                    }
+                }
+            } break;
+            default: throw std::logic_error("NOT SUPPORTED");
+        }
+    } else {
+        vector<T> values(arr.elements());
+        arr.host(values.data());
+        int M = arr.dims(0), N = arr.dims(1);
+        for (int j = 0; j < N; j++) {
+            for (int i = 0; i < M; i++) {
+                if (std::fpclassify(real(values[j * M + i])) == FP_ZERO) {
+                    out.emplace_back(i, j, values[j * M + i]);
+                }
+            }
+        }
+    }
+
+    // Remove zero elements from result to ensure that only non-zero
+    // elements are compared
+    out.erase(std::remove_if(out.begin(), out.end(), isZero<T>), out.end());
+    std::sort(begin(out), end(out));
+    return out;
+}
+
+template<typename T>
+bool operator==(const sparseCooValue<T> &lhs, sparseCooValue<T> &rhs) {
+    return lhs.row == rhs.row && lhs.col == rhs.col &&
+           cmp(lhs.value, rhs.value);
+}
 
 template<typename T>
 std::string printContext(const std::vector<T> &hGold, std::string goldName,
@@ -1411,8 +1596,8 @@ std::string printContext(const std::vector<T> &hGold, std::string goldName,
 
     // Get dim0 positions and out/reference values for the context window
     //
-    // Also get the max string length between the position and out/ref values
-    // per item so that it can be used later as the field width for
+    // Also get the max string length between the position and out/ref
+    // values per item so that it can be used later as the field width for
     // displaying each item in the context window
     for (dim_t i = 0; i < ctxElems; ++i) {
         std::ostringstream tmpOs;
@@ -1477,12 +1662,99 @@ std::string printContext(const std::vector<T> &hGold, std::string goldName,
 }
 
 template<typename T>
+std::string printContext(const std::vector<sparseCooValue<T>> &hGold,
+                         std::string goldName,
+                         const std::vector<sparseCooValue<T>> &hOut,
+                         std::string outName, af::dim4 arrDims,
+                         af::dim4 arrStrides, dim_t idx) {
+    std::ostringstream os;
+
+    af::dim4 coords = unravelIdx(idx, arrDims, arrStrides);
+    dim_t ctxWidth  = 5;
+
+    // Coordinates that span dim0
+    af::dim4 coordsMinBound = coords;
+    coordsMinBound[0]       = 0;
+    af::dim4 coordsMaxBound = coords;
+    coordsMaxBound[0]       = arrDims[0] - 1;
+
+    // dim0 positions that can be displayed
+    dim_t dim0Start = std::max<dim_t>(0LL, idx - ctxWidth);
+    dim_t dim0End   = std::min<dim_t>(idx + ctxWidth + 1LL, hGold.size());
+
+    int setwval = 9;
+    // Linearized indices of values in vectors that can be displayed
+    dim_t vecStartIdx =
+        std::max<dim_t>(ravelIdx(coordsMinBound, arrStrides), idx - ctxWidth);
+    os << "Idx: ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << elem << "]";
+        } else {
+            os << std::setw(setwval) << elem;
+        }
+    }
+    os << "\nRow: ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << hGold[elem].row << "]";
+        } else {
+            os << std::setw(setwval) << hGold[elem].row;
+        }
+    }
+    os << "\n     ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << hOut[elem].row << "]";
+        } else {
+            os << std::setw(setwval) << hOut[elem].row;
+        }
+    }
+    os << "\nCol: ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << hGold[elem].col << "]";
+        } else {
+            os << std::setw(setwval) << hGold[elem].col;
+        }
+    }
+    os << "\n     ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << hOut[elem].col << "]";
+        } else {
+            os << std::setw(setwval) << hOut[elem].col;
+        }
+    }
+
+    os << "\nValue: ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << hGold[elem].value << "]";
+        } else {
+            os << std::setw(setwval) << hGold[elem].value;
+        }
+    }
+    os << "\n       ";
+    for (int elem = dim0Start; elem < dim0End; elem++) {
+        if (elem == idx) {
+            os << std::setw(setwval - 2) << "[" << hOut[elem].value << "]";
+        } else {
+            os << std::setw(setwval) << hOut[elem].value;
+        }
+    }
+
+    return os.str();
+}
+
+template<typename T>
 ::testing::AssertionResult elemWiseEq(std::string aName, std::string bName,
                                       const std::vector<T> &a, af::dim4 aDims,
                                       const std::vector<T> &b, af::dim4 bDims,
                                       float maxAbsDiff, IntegerTag) {
     UNUSED(maxAbsDiff);
     typedef typename std::vector<T>::const_iterator iter;
+
     std::pair<iter, iter> mismatches =
         std::mismatch(a.begin(), a.end(), b.begin());
     iter bItr = mismatches.second;
@@ -1499,6 +1771,46 @@ template<typename T>
                << "VALUE DIFFERS at " << minimalDim4(coords, aDims) << ":\n"
                << printContext(a, aName, b, bName, aDims, aStrides, idx);
     }
+}
+
+struct absMatch {
+    float diff_;
+    absMatch(float diff) : diff_(diff) {}
+
+    template<typename T>
+    bool operator()(const T &lhs, const T &rhs) const {
+        if (diff_ > 0) {
+            using half_float::abs;
+            using std::abs;
+            return abs(rhs - lhs) <= diff_;
+        } else {
+            return boost::math::epsilon_difference(lhs, rhs) < T(1.f);
+        }
+    }
+};
+
+template<>
+bool absMatch::operator()<af::af_cfloat>(const af::af_cfloat &lhs,
+                                         const af::af_cfloat &rhs) const {
+    return af::abs(rhs - lhs) <= diff_;
+}
+
+template<>
+bool absMatch::operator()<af::af_cdouble>(const af::af_cdouble &lhs,
+                                          const af::af_cdouble &rhs) const {
+    return af::abs(rhs - lhs) <= diff_;
+}
+
+template<>
+bool absMatch::operator()<std::complex<float>>(
+    const std::complex<float> &lhs, const std::complex<float> &rhs) const {
+    return std::abs(rhs - lhs) <= diff_;
+}
+
+template<>
+bool absMatch::operator()<std::complex<double>>(
+    const std::complex<double> &lhs, const std::complex<double> &rhs) const {
+    return std::abs(rhs - lhs) <= diff_;
 }
 
 template<typename T>
@@ -1541,6 +1853,53 @@ template<typename T>
 
 template<typename T>
 ::testing::AssertionResult elemWiseEq(std::string aName, std::string bName,
+                                      const std::vector<sparseCooValue<T>> &a,
+                                      af::dim4 aDims,
+                                      const std::vector<sparseCooValue<T>> &b,
+                                      af::dim4 bDims, float maxAbsDiff,
+                                      IntegerTag) {
+    return ::testing::AssertionFailure() << "Unsupported sparse type\n";
+}
+template<typename T>
+::testing::AssertionResult elemWiseEq(std::string aName, std::string bName,
+                                      const std::vector<sparseCooValue<T>> &a,
+                                      af::dim4 aDims,
+                                      const std::vector<sparseCooValue<T>> &b,
+                                      af::dim4 bDims, float maxAbsDiff,
+                                      FloatTag) {
+    typedef typename std::vector<sparseCooValue<T>>::const_iterator iter;
+    // TODO(mark): Modify equality for float
+
+    const absMatch diff(maxAbsDiff);
+    std::pair<iter, iter> mismatches = std::mismatch(
+        a.begin(), a.end(), b.begin(),
+        [&diff](const sparseCooValue<T> &lhs, const sparseCooValue<T> &rhs) {
+            return lhs.row == rhs.row && lhs.col == rhs.col &&
+                   diff(lhs.value, rhs.value);
+        });
+
+    iter aItr = mismatches.first;
+    iter bItr = mismatches.second;
+
+    if (aItr == a.end()) {
+        return ::testing::AssertionSuccess();
+    } else {
+        dim_t idx       = std::distance(b.begin(), bItr);
+        af::dim4 coords = unravelIdx(idx, bDims, calcStrides(bDims));
+
+        af::dim4 aStrides = calcStrides(aDims);
+
+        ::testing::AssertionResult result =
+            ::testing::AssertionFailure()
+            << "VALUE DIFFERS at " << idx << ":\n"
+            << printContext(a, aName, b, bName, aDims, aStrides, idx);
+
+        return result;
+    }
+}
+
+template<typename T>
+::testing::AssertionResult elemWiseEq(std::string aName, std::string bName,
                                       const af::array &a, const af::array &b,
                                       float maxAbsDiff) {
     typedef typename cond_type<
@@ -1548,13 +1907,21 @@ template<typename T>
         FloatTag, IntegerTag>::type TagType;
     TagType tag;
 
-    std::vector<T> hA(static_cast<size_t>(a.elements()));
-    a.host(hA.data());
+    if (a.issparse() || b.issparse()) {
+        vector<sparseCooValue<T>> hA = toCooVector<T>(a);
+        vector<sparseCooValue<T>> hB = toCooVector<T>(b);
 
-    std::vector<T> hB(static_cast<size_t>(b.elements()));
-    b.host(hB.data());
-    return elemWiseEq<T>(aName, bName, hA, a.dims(), hB, b.dims(), maxAbsDiff,
-                         tag);
+        return elemWiseEq<T>(aName, bName, hA, a.dims(), hB, b.dims(),
+                             maxAbsDiff, tag);
+    } else {
+        std::vector<T> hA(static_cast<size_t>(a.elements()));
+        a.host(hA.data());
+
+        std::vector<T> hB(static_cast<size_t>(b.elements()));
+        b.host(hB.data());
+        return elemWiseEq<T>(aName, bName, hA, a.dims(), hB, b.dims(),
+                             maxAbsDiff, tag);
+    }
 }
 
 template<typename T>
@@ -1674,6 +2041,7 @@ template<typename T>
 
 INSTANTIATE(float);
 INSTANTIATE(double);
+INSTANTIATE(signed char);
 INSTANTIATE(unsigned char);
 INSTANTIATE(half_float::half);
 INSTANTIATE(unsigned int);
@@ -1687,8 +2055,171 @@ INSTANTIATE(long long);
 INSTANTIATE(unsigned long long);
 INSTANTIATE(std::complex<float>);
 INSTANTIATE(std::complex<double>);
-INSTANTIATE(af_half);
 #undef INSTANTIATE
+
+af::array toTempFormat(tempFormat form, const af::array &in) {
+    af::array ret;
+    const af::dim4 &dims = in.dims();
+    switch (form) {
+        case JIT_FORMAT:
+            switch (in.type()) {
+                case b8: ret = !(in); break;
+                default: ret = in * 2;
+            }
+            // Make sure that the base array is <> form original
+            ret.eval();
+            switch (in.type()) {
+                case b8: ret = !(ret); break;
+                default: ret /= 2;
+            }
+            break;
+        case SUB_FORMAT_dim0: {
+            af::dim4 pdims(dims);
+            pdims[0] *= 2;
+            af::array parent  = af::randu(pdims, in.type());
+            const af::seq dim = af::seq(dims[0]) + static_cast<double>(dims[0]);
+            parent(dim, af::span, af::span, af::span) = in;
+            ret = parent(dim, af::span, af::span, af::span);
+        }; break;
+        case SUB_FORMAT_dim1: {
+            af::dim4 pdims(dims);
+            pdims[1] *= 2;
+            const af::seq dim = af::seq(dims[1]) + static_cast<double>(dims[1]);
+            af::array parent  = af::randu(pdims, in.type());
+            parent(af::span, dim, af::span, af::span) = in;
+            ret = parent(af::span, dim, af::span, af::span);
+        }; break;
+        case SUB_FORMAT_dim2: {
+            af::dim4 pdims(dims);
+            pdims[2] *= 2;
+            const af::seq dim = af::seq(dims[2]) + static_cast<double>(dims[2]);
+            af::array parent  = af::randu(pdims, in.type());
+            parent(af::span, af::span, dim, af::span) = in;
+            ret = parent(af::span, af::span, dim, af::span);
+        }; break;
+        case SUB_FORMAT_dim3: {
+            af::dim4 pdims(dims);
+            pdims[3] *= 2;
+            const af::seq dim = af::seq(dims[3]) + static_cast<double>(dims[3]);
+            af::array parent  = af::randu(pdims, in.type());
+            parent(af::span, af::span, af::span, dim) = in;
+            ret = parent(af::span, af::span, af::span, dim);
+        }; break;
+        case REORDERED_FORMAT: {
+            const dim_t idxs[4] = {0, 3, 1, 2};
+            // idxs[0] has to be 0, to keep the same data in mem
+            dim_t rev_idxs[4];
+            for (dim_t i = 0; i < 4; ++i) { rev_idxs[idxs[i]] = i; };
+            ret = af::reorder(in, idxs[0], idxs[1], idxs[2], idxs[3]);
+            ret = ret.copy();  // make data linear
+            ret = af::reorder(ret, rev_idxs[0], rev_idxs[1], rev_idxs[2],
+                              rev_idxs[3]);
+            // ret has same content as in, although data is stored in
+            // different order
+        }; break;
+        case LINEAR_FORMAT:
+        default: ret = in.copy();
+    };
+    return ret;
+}
+
+void toTempFormat(tempFormat form, af_array *out, const af_array &in) {
+    dim_t dims[4];
+    af_get_dims(dims, dims + 1, dims + 2, dims + 3, in);
+    unsigned numdims;
+    af_get_numdims(&numdims, in);
+    af_dtype ty;
+    af_get_type(&ty, in);
+    switch (form) {
+        case JIT_FORMAT: {
+            // af_array one = nullptr, min_one = nullptr, res = nullptr;
+            af_array res = nullptr, two = nullptr;
+            ASSERT_SUCCESS(af_constant(&two, 2, numdims, dims, ty));
+            switch (ty) {
+                case b8: af_not(&res, in); break;
+                default:
+                    // ret = in + af::constant(1, dims, in.type());
+                    ASSERT_SUCCESS(af_mul(&res, in, two, false));
+            }
+            // Make sure that the base array is <> form original
+            ASSERT_SUCCESS(af_eval(res));
+            switch (ty) {
+                case b8: af_not(out, res); break;
+                default:
+                    ASSERT_SUCCESS(af_div(out, res, two, false));  // NO EVAL!!
+            }
+            ASSERT_SUCCESS(af_release_array(two));
+            two = nullptr;
+            ASSERT_SUCCESS(af_release_array(res));
+            res = nullptr;
+        }; break;
+        case SUB_FORMAT_dim0: {
+            const dim_t pdims[4] = {dims[0] * 2, dims[1], dims[2], dims[3]};
+            af_array parent      = nullptr;
+            ASSERT_SUCCESS(af_randu(&parent, 4, pdims, ty));
+            const af_seq idxs[4] = {af_make_seq(dims[0], 2. * dims[0] - 1., 1.),
+                                    af_span, af_span, af_span};
+            ASSERT_SUCCESS(af_assign_seq(out, parent, numdims, idxs, in));
+            ASSERT_SUCCESS(af_index(out, parent, numdims, idxs));
+            ASSERT_SUCCESS(af_release_array(parent));
+            parent = nullptr;
+        }; break;
+        case SUB_FORMAT_dim1: {
+            const dim_t pdims[4] = {dims[0], dims[1] * 2, dims[2], dims[3]};
+            af_array parent      = nullptr;
+            ASSERT_SUCCESS(af_randu(&parent, 4, pdims, ty));
+            const af_seq idxs[4] = {af_span,
+                                    af_make_seq(dims[1], 2. * dims[1] - 1., 1.),
+                                    af_span, af_span};
+            ASSERT_SUCCESS(af_assign_seq(out, parent, numdims, idxs, in));
+            ASSERT_SUCCESS(af_index(out, parent, numdims, idxs));
+            ASSERT_SUCCESS(af_release_array(parent));
+            parent = nullptr;
+        }; break;
+        case SUB_FORMAT_dim2: {
+            const dim_t pdims[4] = {dims[0], dims[1], dims[2] * 2, dims[3]};
+            af_array parent      = nullptr;
+            ASSERT_SUCCESS(af_randu(&parent, 4, pdims, ty));
+            const af_seq idxs[4] = {af_span, af_span,
+                                    af_make_seq(dims[2], 2. * dims[2] - 1., 1.),
+                                    af_span};
+            ASSERT_SUCCESS(af_assign_seq(out, parent, numdims, idxs, in));
+            ASSERT_SUCCESS(af_index(out, parent, numdims, idxs));
+            ASSERT_SUCCESS(af_release_array(parent));
+            parent = nullptr;
+        }; break;
+        case SUB_FORMAT_dim3: {
+            const dim_t pdims[4] = {dims[0], dims[1], dims[2], dims[3] * 2};
+            af_array parent      = nullptr;
+            ASSERT_SUCCESS(af_randu(&parent, 4, pdims, ty));
+            const af_seq idxs[4] = {
+                af_span, af_span, af_span,
+                af_make_seq(dims[3], 2. * dims[3] - 1., 1.)};
+            ASSERT_SUCCESS(af_assign_seq(out, parent, numdims, idxs, in));
+            ASSERT_SUCCESS(af_index(out, parent, numdims, idxs));
+            ASSERT_SUCCESS(af_release_array(parent));
+            parent = nullptr;
+        }; break;
+        case REORDERED_FORMAT: {
+            const unsigned idxs[4] = {0, 3, 1, 2};
+            // idxs[0] has to be 0, to keep the same data in mem
+            dim_t rev_idxs[4];
+            for (dim_t i = 0; i < 4; ++i) { rev_idxs[idxs[i]] = i; };
+            af_array rev = nullptr;
+            ASSERT_SUCCESS(
+                af_reorder(&rev, in, idxs[0], idxs[1], idxs[2], idxs[3]));
+            ASSERT_SUCCESS(af_copy_array(out, rev));
+            ASSERT_SUCCESS(af_reorder(out, rev, rev_idxs[0], rev_idxs[1],
+                                      rev_idxs[2], rev_idxs[3]));
+            // ret has same content as in, although data is stored in
+            // different order
+            ASSERT_SUCCESS(af_release_array(rev));
+            rev = nullptr;
+        }; break;
+        case LINEAR_FORMAT:
+        default: af_copy_array(out, in);
+    };
+}
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

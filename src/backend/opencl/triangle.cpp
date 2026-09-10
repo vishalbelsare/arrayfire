@@ -14,8 +14,9 @@
 #include <af/dim4.hpp>
 
 using af::dim4;
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T>
@@ -46,9 +47,11 @@ INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
 INSTANTIATE(char)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(half)
 
 }  // namespace opencl
+}  // namespace arrayfire

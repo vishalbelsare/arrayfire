@@ -21,12 +21,12 @@ using std::vector;
 template<typename T>
 class Array : public ::testing::Test {};
 
-typedef ::testing::Types<float, double, cfloat, cdouble, char, unsigned char,
-                         int, uint, intl, uintl, short, ushort,
+typedef ::testing::Types<float, double, cfloat, cdouble, char, signed char,
+                         unsigned char, int, uint, intl, uintl, short, ushort,
                          half_float::half>
     TestTypes;
 
-TYPED_TEST_CASE(Array, TestTypes);
+TYPED_TEST_SUITE(Array, TestTypes);
 
 TEST(Array, ConstructorDefault) {
     array a;
@@ -302,6 +302,17 @@ TYPED_TEST(Array, TypeAttributes) {
             EXPECT_FALSE(one.isbool());
             EXPECT_FALSE(one.ishalf());
             break;
+        case s8:
+            EXPECT_FALSE(one.isfloating());
+            EXPECT_FALSE(one.isdouble());
+            EXPECT_FALSE(one.issingle());
+            EXPECT_FALSE(one.isrealfloating());
+            EXPECT_TRUE(one.isinteger());
+            EXPECT_TRUE(one.isreal());
+            EXPECT_FALSE(one.iscomplex());
+            EXPECT_FALSE(one.isbool());
+            EXPECT_FALSE(one.ishalf());
+            break;
         case u8:
             EXPECT_FALSE(one.isfloating());
             EXPECT_FALSE(one.isdouble());
@@ -473,7 +484,7 @@ TEST(DeviceId, Same) {
 
 TEST(DeviceId, Different) {
     int ndevices = getDeviceCount();
-    if (ndevices < 2) return;
+    if (ndevices < 2) GTEST_SKIP() << "Skipping mult-GPU test";
     int id0 = getDevice();
     int id1 = (id0 + 1) % ndevices;
 
@@ -491,7 +502,8 @@ TEST(DeviceId, Different) {
 
         af_array c;
         af_err err = af_matmul(&c, a.get(), b.get(), AF_MAT_NONE, AF_MAT_NONE);
-        ASSERT_EQ(err, AF_ERR_DEVICE);
+        af::sync();
+        ASSERT_EQ(err, AF_SUCCESS);
     }
 
     setDevice(id1);
@@ -500,14 +512,37 @@ TEST(DeviceId, Different) {
     deviceGC();
 }
 
+TEST(Device, MigrateAllDevicesToAllDevices) {
+    int ndevices = getDeviceCount();
+    if (ndevices < 2) GTEST_SKIP() << "Skipping mult-GPU test";
+
+    for (int i = 0; i < ndevices; i++) {
+        for (int j = 0; j < ndevices; j++) {
+            setDevice(i);
+            array a = constant(i * 255, 10, 10);
+            a.eval();
+
+            setDevice(j);
+            array b = constant(j * 256, 10, 10);
+            b.eval();
+
+            array c = a + b;
+
+            std::vector<float> gold(10 * 10, i * 255 + j * 256);
+
+            ASSERT_VEC_ARRAY_EQ(gold, dim4(10, 10), c);
+        }
+    }
+}
+
 TEST(Device, empty) {
     array a = array();
-    ASSERT_EQ(a.device<float>() == NULL, 1);
+    ASSERT_EQ(a.device<float>(), nullptr);
 }
 
 TEST(Device, JIT) {
     array a = constant(1, 5, 5);
-    ASSERT_EQ(a.device<float>() != NULL, 1);
+    ASSERT_NE(a.device<float>(), nullptr);
 }
 
 TYPED_TEST(Array, Scalar) {
@@ -520,7 +555,7 @@ TYPED_TEST(Array, Scalar) {
 
     a.host((void *)gold.data());
 
-    EXPECT_EQ(true, gold[0] == a.scalar<TypeParam>());
+    EXPECT_EQ(gold[0], a.scalar<TypeParam>());
 }
 
 TEST(Array, ScalarTypeMismatch) {
@@ -584,14 +619,10 @@ TEST(Array, CopyListInitializerListDim4Assignment) {
 }
 
 TEST(Array, EmptyArrayHostCopy) {
-    EXPECT_EXIT(
-        {
-            af::array empty;
-            std::vector<float> hdata(100);
-            empty.host(hdata.data());
-            exit(0);
-        },
-        ::testing::ExitedWithCode(0), ".*");
+    af::array empty;
+    std::vector<float> hdata(100);
+    empty.host(hdata.data());
+    SUCCEED();
 }
 
 TEST(Array, ReferenceCount1) {
@@ -639,4 +670,43 @@ TEST(Array, ReferenceCount2) {
         ASSERT_REF(c, 0) << "After d = c;";
         ASSERT_REF(d, 0) << "After d = c;";
     }
+}
+
+// This tests situations where the compiler incorrectly assumes the
+// initializer list constructor instead of the regular constructor when
+// using the uniform initilization syntax
+TEST(Array, InitializerListFixAFArray) {
+    af::array a = randu(1);
+    af::array b{a};
+
+    ASSERT_ARRAYS_EQ(a, b);
+}
+
+// This tests situations where the compiler incorrectly assumes the
+// initializer list constructor instead of the regular constructor when
+// using the uniform initilization syntax
+TEST(Array, InitializerListFixDim4) {
+    af::array a        = randu(1);
+    vector<float> data = {3.14f, 3.14f, 3.14f, 3.14f, 3.14f,
+                          3.14f, 3.14f, 3.14f, 3.14f};
+    af::array b{dim4(3, 3), data.data()};
+    ASSERT_ARRAYS_EQ(constant(3.14, 3, 3), b);
+}
+
+TEST(Array, OtherDevice) {
+    if (af::getDeviceCount() == 1) GTEST_SKIP() << "Single device. Skipping";
+    af::setDevice(0);
+    af::info();
+    af::array a = constant(3, 5, 5);
+    a.eval();
+    af::setDevice(1);
+    af::info();
+    af::array b = constant(2, 5, 5);
+    b.eval();
+
+    af::array c = a + b;
+    af::eval(c);
+    af::sync();
+    af::setDevice(0);
+    ASSERT_ARRAYS_EQ(constant(5, 5, 5), c);
 }

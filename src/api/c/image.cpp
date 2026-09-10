@@ -21,22 +21,28 @@
 #include <handle.hpp>
 #include <image.hpp>
 #include <join.hpp>
+#include <platform.hpp>
 #include <reorder.hpp>
 #include <tile.hpp>
 
 #include <limits>
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
+using arrayfire::common::ForgeManager;
+using arrayfire::common::ForgeModule;
+using arrayfire::common::forgePlugin;
+using arrayfire::common::getGLType;
+using arrayfire::common::makeContextCurrent;
 using detail::arithOp;
 using detail::Array;
 using detail::copy_image;
 using detail::createValueArray;
 using detail::forgeManager;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::ushort;
-using graphics::ForgeManager;
 
 template<typename T>
 Array<T> normalizePerType(const Array<T>& in) {
@@ -97,11 +103,12 @@ af_err af_draw_image(const af_window window, const af_array in,
             case u32: image = convert_and_copy_image<uint>(in); break;
             case s16: image = convert_and_copy_image<short>(in); break;
             case u16: image = convert_and_copy_image<ushort>(in); break;
+            case s8: image = convert_and_copy_image<schar>(in); break;
             case u8: image = convert_and_copy_image<uchar>(in); break;
             default: TYPE_ERROR(1, type);
         }
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         auto gridDims  = forgeManager().getWindowGrid(window);
         FG_CHECK(_.fg_set_window_colormap(window, (fg_color_map)props->cmap));
         if (props->col > -1 && props->row > -1) {

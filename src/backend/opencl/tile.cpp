@@ -13,8 +13,9 @@
 #include <common/half.hpp>
 #include <stdexcept>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> tile(const Array<T> &in, const af::dim4 &tileDims) {
@@ -40,6 +41,7 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(short)
@@ -47,3 +49,4 @@ INSTANTIATE(ushort)
 INSTANTIATE(half)
 
 }  // namespace opencl
+}  // namespace arrayfire

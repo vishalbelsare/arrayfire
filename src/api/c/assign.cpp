@@ -15,11 +15,11 @@
 #include <common/err_common.hpp>
 #include <common/half.hpp>
 #include <common/moddims.hpp>
+#include <common/tile.hpp>
 #include <copy.hpp>
 #include <handle.hpp>
 #include <indexing_common.hpp>
 #include <math.hpp>
-#include <tile.hpp>
 #include <af/data.h>
 #include <af/defines.h>
 #include <af/dim4.hpp>
@@ -30,17 +30,19 @@ using std::swap;
 using std::vector;
 
 using af::dim4;
-using common::convert2Canonical;
-using common::createSpanIndex;
-using common::half;
-using common::if_complex;
-using common::if_real;
-using common::modDims;
+using arrayfire::common::convert2Canonical;
+using arrayfire::common::createSpanIndex;
+using arrayfire::common::half;
+using arrayfire::common::if_complex;
+using arrayfire::common::if_real;
+using arrayfire::common::modDims;
+using arrayfire::common::tile;
 using detail::Array;
 using detail::cdouble;
 using detail::cfloat;
 using detail::createSubArray;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -77,9 +79,9 @@ static void assign(Array<Tout>& out, const vector<af_seq> seqs,
 
         // If both out and in are vectors of equal elements,
         // reshape in to out dims
-        Array<Tin> in_ =
-            in.elements() == 1 ? tile(in, oDims) : modDims(in, oDims);
-        auto dst = createSubArray<Tout>(out, seqs, false);
+        Array<Tin> in_ = in.elements() == 1 ? arrayfire::common::tile(in, oDims)
+                                            : modDims(in, oDims);
+        auto dst       = createSubArray<Tout>(out, seqs, false);
 
         copyArray<Tin, Tout>(dst, in_);
     } else {
@@ -121,6 +123,7 @@ static if_real<T> assign(Array<T>& out, const vector<af_seq> iv,
         case u64: assign<T, uintl>(out, iv, getArray<uintl>(in)); break;
         case s16: assign<T, short>(out, iv, getArray<short>(in)); break;
         case u16: assign<T, ushort>(out, iv, getArray<ushort>(in)); break;
+        case s8: assign<T, schar>(out, iv, getArray<schar>(in)); break;
         case u8: assign<T, uchar>(out, iv, getArray<uchar>(in)); break;
         case b8: assign<T, char>(out, iv, getArray<char>(in)); break;
         case f16: assign<T, half>(out, iv, getArray<half>(in)); break;
@@ -200,6 +203,7 @@ af_err af_assign_seq(af_array* out, const af_array lhs, const unsigned ndims,
                     case u64: assign(getArray<uintl>(res), inSeqs, rhs); break;
                     case s16: assign(getArray<short>(res), inSeqs, rhs); break;
                     case u16: assign(getArray<ushort>(res), inSeqs, rhs); break;
+                    case s8: assign(getArray<schar>(res), inSeqs, rhs); break;
                     case u8: assign(getArray<uchar>(res), inSeqs, rhs); break;
                     case b8: assign(getArray<char>(res), inSeqs, rhs); break;
                     case f16: assign(getArray<half>(res), inSeqs, rhs); break;
@@ -259,8 +263,6 @@ af_err af_assign_gen(af_array* out, const af_array lhs, const dim_t ndims,
             return af_create_handle(out, 0, nullptr, lhsType);
         }
 
-        ARG_ASSERT(2, (ndims == 1) || (ndims == (dim_t)lInfo.ndims()));
-
         if (ndims == 1 && ndims != static_cast<dim_t>(lInfo.ndims())) {
             af_array tmp_in  = 0;
             af_array tmp_out = 0;
@@ -278,7 +280,6 @@ af_err af_assign_gen(af_array* out, const af_array lhs, const dim_t ndims,
 
         ARG_ASSERT(1, (lhsType == rhsType));
         ARG_ASSERT(1, (lhsDims.ndims() >= rhsDims.ndims()));
-        ARG_ASSERT(2, (lhsDims.ndims() >= ndims));
 
         af_array output = 0;
         if (*out != lhs) {
@@ -384,6 +385,7 @@ af_err af_assign_gen(af_array* out, const af_array lhs, const dim_t ndims,
                 case s32: genAssign<int>(output, ptr, rhs); break;
                 case s16: genAssign<short>(output, ptr, rhs); break;
                 case u16: genAssign<ushort>(output, ptr, rhs); break;
+                case s8: genAssign<schar>(output, ptr, rhs); break;
                 case u8: genAssign<uchar>(output, ptr, rhs); break;
                 case b8: genAssign<char>(output, ptr, rhs); break;
                 case f16: genAssign<half>(output, ptr, rhs); break;

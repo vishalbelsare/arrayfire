@@ -25,10 +25,10 @@ template<typename T>
 class InverseDeconvolution : public ::testing::Test {};
 
 // create a list of types to be tested
-typedef ::testing::Types<float, uchar, short, ushort> TestTypes;
+typedef ::testing::Types<float, schar, uchar, short, ushort> TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(InverseDeconvolution, TestTypes);
+TYPED_TEST_SUITE(InverseDeconvolution, TestTypes);
 
 template<typename T, bool isColor>
 void invDeconvImageTest(string pTestFile, const float gamma,
@@ -38,7 +38,7 @@ void invDeconvImageTest(string pTestFile, const float gamma,
             OutType;
 
     SUPPORTED_TYPE_CHECK(T);
-    if (noImageIOTests()) return;
+    IMAGEIO_ENABLED_CHECK();
 
     using af::dim4;
 

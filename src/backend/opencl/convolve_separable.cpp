@@ -16,6 +16,7 @@
 
 using af::dim4;
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T, typename accT>
@@ -64,6 +65,7 @@ INSTANTIATE(double, double)
 INSTANTIATE(float, float)
 INSTANTIATE(uint, float)
 INSTANTIATE(int, float)
+INSTANTIATE(schar, float)
 INSTANTIATE(uchar, float)
 INSTANTIATE(char, float)
 INSTANTIATE(short, float)
@@ -72,3 +74,4 @@ INSTANTIATE(intl, float)
 INSTANTIATE(uintl, float)
 
 }  // namespace opencl
+}  // namespace arrayfire

@@ -11,6 +11,7 @@
 #include <common/kernel_type.hpp>
 #include <complex>
 
+namespace arrayfire {
 namespace cpu {
 
 namespace {
@@ -30,6 +31,7 @@ using cdouble = std::complex<double>;
 using cfloat  = std::complex<float>;
 using intl    = long long;
 using uint    = unsigned int;
+using schar   = signed char;
 using uchar   = unsigned char;
 using uintl   = unsigned long long;
 using ushort  = unsigned short;
@@ -49,8 +51,8 @@ struct kernel_type;
 class half;
 
 template<>
-struct kernel_type<common::half> {
-    using data = common::half;
+struct kernel_type<arrayfire::common::half> {
+    using data = arrayfire::common::half;
 
     // These are the types within a kernel
     using native = float;
@@ -58,3 +60,5 @@ struct kernel_type<common::half> {
     using compute = float;
 };
 }  // namespace common
+
+}  // namespace arrayfire

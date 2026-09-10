@@ -74,11 +74,12 @@ class MemAlloc : public ::testing::Test {
 
 // create a list of types to be tested
 typedef ::testing::Types<float, double, cfloat, cdouble, int, unsigned int,
-                         intl, uintl, char, unsigned char, short, ushort>
+                         intl, uintl, char, signed char, unsigned char, short,
+                         ushort>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(MemAlloc, TestTypes);
+TYPED_TEST_SUITE(MemAlloc, TestTypes);
 
 size_t roundUpToStep(size_t bytes) {
     if (step_bytes == 0) return bytes;
@@ -917,6 +918,7 @@ TEST_F(MemoryManagerApi, E2ETest4D) {
 }
 
 TEST_F(MemoryManagerApi, E2ETest4DComplexDouble) {
+    SUPPORTED_TYPE_CHECK(double);
     size_t aSize = 8;
 
     af::array a = af::array(aSize, aSize, aSize, aSize, af::dtype::c64);
@@ -932,6 +934,7 @@ TEST_F(MemoryManagerApi, E2ETest4DComplexDouble) {
 }
 
 TEST_F(MemoryManagerApi, E2ETestMultipleAllocations) {
+    SUPPORTED_TYPE_CHECK(double);
     size_t aSize = 8;
 
     af::array a = af::array(aSize, af::dtype::c64);

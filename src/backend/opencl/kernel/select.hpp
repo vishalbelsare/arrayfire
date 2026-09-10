@@ -17,9 +17,10 @@
 #include <math.hpp>
 #include <traits.hpp>
 
+#include <array>
 #include <string>
-#include <vector>
 
+namespace arrayfire {
 namespace opencl {
 namespace kernel {
 constexpr uint DIMX  = 32;
@@ -29,18 +30,16 @@ constexpr int REPEAT = 64;
 template<typename T>
 void selectLauncher(Param out, Param cond, Param a, Param b, const int ndims,
                     const bool is_same) {
-    std::vector<TemplateArg> targs = {
+    std::array<TemplateArg, 2> targs = {
         TemplateTypename<T>(),
         TemplateArg(is_same),
     };
-    std::vector<std::string> options = {
-        DefineKeyValue(T, dtype_traits<T>::getName()),
-        DefineValue(is_same),
-    };
-    options.emplace_back(getTypeBuildDefinition<T>());
+    std::array<std::string, 3> options = {
+        DefineKeyValue(T, dtype_traits<T>::getName()), DefineValue(is_same),
+        getTypeBuildDefinition<T>()};
 
     auto selectOp =
-        common::getKernel("select_kernel", {select_cl_src}, targs, options);
+        common::getKernel("select_kernel", {{select_cl_src}}, targs, options);
 
     int threads[] = {DIMX, DIMY};
 
@@ -72,19 +71,17 @@ void select(Param out, Param cond, Param a, Param b, int ndims) {
 }
 
 template<typename T>
-void select_scalar(Param out, Param cond, Param a, const double b,
-                   const int ndims, const bool flip) {
-    std::vector<TemplateArg> targs = {
+void select_scalar(Param out, Param cond, Param a, const T b, const int ndims,
+                   const bool flip) {
+    std::array<TemplateArg, 2> targs = {
         TemplateTypename<T>(),
         TemplateArg(flip),
     };
-    std::vector<std::string> options = {
-        DefineKeyValue(T, dtype_traits<T>::getName()),
-        DefineValue(flip),
-    };
-    options.emplace_back(getTypeBuildDefinition<T>());
+    std::array<std::string, 3> options = {
+        DefineKeyValue(T, dtype_traits<T>::getName()), DefineValue(flip),
+        getTypeBuildDefinition<T>()};
 
-    auto selectOp = common::getKernel("select_scalar_kernel", {select_cl_src},
+    auto selectOp = common::getKernel("select_scalar_kernel", {{select_cl_src}},
                                       targs, options);
 
     int threads[] = {DIMX, DIMY};
@@ -103,8 +100,8 @@ void select_scalar(Param out, Param cond, Param a, const double b,
                        groups_1 * out.info.dims[3] * local[1]);
 
     selectOp(cl::EnqueueArgs(getQueue(), global, local), *out.data, out.info,
-             *cond.data, cond.info, *a.data, a.info, scalar<T>(b), groups_0,
-             groups_1);
+             *cond.data, cond.info, *a.data, a.info, b, groups_0, groups_1);
 }
 }  // namespace kernel
 }  // namespace opencl
+}  // namespace arrayfire

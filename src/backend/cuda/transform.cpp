@@ -9,16 +9,22 @@
 
 #include <transform.hpp>
 
+#include <copy.hpp>
 #include <kernel/transform.hpp>
 #include <utility.hpp>
 
+namespace arrayfire {
 namespace cuda {
 
 template<typename T>
 void transform(Array<T> &out, const Array<T> &in, const Array<float> &tf,
                const af::interpType method, const bool inverse,
                const bool perspective) {
-    kernel::transform<T>(out, in, tf, inverse, perspective, method,
+    // TODO: Temporary Fix, must fix handling subarrays upstream
+    // tf has to be linear, although offset is allowed.
+    const Array<float> tf_Lin = tf.isLinear() ? tf : copyArray(tf);
+
+    kernel::transform<T>(out, in, tf_Lin, inverse, perspective, method,
                          interpOrder(method));
 }
 
@@ -36,9 +42,11 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 
 }  // namespace cuda
+}  // namespace arrayfire

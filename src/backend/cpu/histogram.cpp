@@ -16,8 +16,9 @@
 #include <af/dim4.hpp>
 
 using af::dim4;
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace cpu {
 
 template<typename T>
@@ -47,6 +48,7 @@ INSTANTIATE(double)
 INSTANTIATE(char)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
@@ -55,3 +57,4 @@ INSTANTIATE(uintl)
 INSTANTIATE(half)
 
 }  // namespace cpu
+}  // namespace arrayfire

@@ -36,11 +36,11 @@ class Random : public ::testing::Test {
 
 // create a list of types to be tested
 typedef ::testing::Types<float, cfloat, double, cdouble, int, unsigned, intl,
-                         uintl, unsigned char, af_half>
+                         uintl, signed char, unsigned char, char, af_half>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Random, TestTypes);
+TYPED_TEST_SUITE(Random, TestTypes);
 
 template<typename T>
 class Random_norm : public ::testing::Test {
@@ -69,21 +69,21 @@ class RandomSeed : public ::testing::Test {
 // create a list of types to be tested
 typedef ::testing::Types<float, cfloat, double, cdouble, af_half> TestTypesNorm;
 // register the type list
-TYPED_TEST_CASE(Random_norm, TestTypesNorm);
+TYPED_TEST_SUITE(Random_norm, TestTypesNorm);
 
 // create a list of types to be tested
 typedef ::testing::Types<float, double> TestTypesEngine;
 // register the type list
-TYPED_TEST_CASE(RandomEngine, TestTypesEngine);
+TYPED_TEST_SUITE(RandomEngine, TestTypesEngine);
 
 typedef ::testing::Types<unsigned> TestTypesEngineSeed;
 // register the type list
-TYPED_TEST_CASE(RandomEngineSeed, TestTypesEngineSeed);
+TYPED_TEST_SUITE(RandomEngineSeed, TestTypesEngineSeed);
 
 // create a list of types to be tested
 typedef ::testing::Types<unsigned> TestTypesSeed;
 // register the type list
-TYPED_TEST_CASE(RandomSeed, TestTypesSeed);
+TYPED_TEST_SUITE(RandomSeed, TestTypesSeed);
 
 template<typename T>
 void randuTest(dim4 &dims) {
@@ -258,15 +258,15 @@ void testSetSeed(const uintl seed0, const uintl seed1) {
         ASSERT_EQ(h_in0[i], h_in2[i]) << "at : " << i;
 
         // Verify different arrays created with different seeds differ
-        // b8 and u9 can clash because they generate a small set of values
-        if (ty != b8 && ty != u8) {
+        // b8, s8 and u8 can clash because they generate a small set of values
+        if (ty != b8 && ty != s8 && ty != u8) {
             ASSERT_NE(h_in0[i], h_in1[i]) << "at : " << i;
         }
 
         // Verify different arrays created one after the other with same seed
-        // differ b8 and u9 can clash because they generate a small set of
+        // differ b8, s8 and u8 can clash because they generate a small set of
         // values
-        if (ty != b8 && ty != u8) {
+        if (ty != b8 && ty != s8 && ty != u8) {
             ASSERT_NE(h_in2[i], h_in3[i]) << "at : " << i;
         }
     }
@@ -394,7 +394,7 @@ void testRandomEngineSeed(randomEngineType type) {
 
     for (int i = 0; i < elem; i++) {
         ASSERT_EQ(h1[i], h3[i]) << "at : " << i;
-        if (ty != b8 && ty != u8) {
+        if (ty != b8 && ty != s8 && ty != u8) {
             ASSERT_NE(h1[i], h2[i]) << "at : " << i;
             ASSERT_NE(h3[i], h4[i]) << "at : " << i;
         }

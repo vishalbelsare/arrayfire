@@ -7,7 +7,7 @@ project using almost any editor, compiler, or build system. The only requirement
 is that you can include the ArrayFire header directory, and link with the
 ArrayFire library you intend to use.
 
-## <a name="big-picture"/> The big picture
+## The big picture {#big-picture-osx}
 
 By default, the ArrayFire OSX installer will place several files in your
 computer's `/opt/arrayfire` directory. The installer will populate this
@@ -30,10 +30,10 @@ CMake or Makefiles with CMake being our preferred build system.
 * [CMake](#CMake)
 * [Makefiles](#Makefiles)
 
-## <a name="CMake"></a>CMake
+## CMake {#CMake}
 
 The CMake build system can be used to create ArrayFire projects. As [discussed
-above](#big-picture), ArrayFire ships with a series of CMake scripts to make
+above](#big-picture-osx), ArrayFire ships with a series of CMake scripts to make
 finding and using our library easy.
 
 First create a file called `CMakeLists.txt` in your project directory:
@@ -80,7 +80,7 @@ you would modify the `cmake` command above to contain the following definition:
 
 You can also specify this information in the `ccmake` command-line interface.
 
-## <a name="Makefiles"></a> Makefiles
+## Makefiles {#Makefiles}
 
 Building ArrayFire projects with Makefiles is fairly similar to CMake except you
 must specify all paths and libraries manually.

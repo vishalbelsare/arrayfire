@@ -10,6 +10,7 @@
 #include <Array.hpp>
 #include <af/dim4.hpp>
 
+namespace arrayfire {
 namespace cuda {
 template<typename T>
 void select(Array<T> &out, const Array<char> &cond, const Array<T> &a,
@@ -17,7 +18,7 @@ void select(Array<T> &out, const Array<char> &cond, const Array<T> &a,
 
 template<typename T, bool flip>
 void select_scalar(Array<T> &out, const Array<char> &cond, const Array<T> &a,
-                   const double &b);
+                   const T &b);
 
 template<typename T>
 Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
@@ -25,5 +26,6 @@ Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
 
 template<typename T, bool flip>
 Array<T> createSelectNode(const Array<char> &cond, const Array<T> &a,
-                          const double &b_val, const af::dim4 &odims);
+                          const T &b_val, const af::dim4 &odims);
 }  // namespace cuda
+}  // namespace arrayfire

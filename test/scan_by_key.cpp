@@ -127,6 +127,7 @@ void scanByKeyTest(dim4 dims, int scanDim, vector<int> nodeLengths,
 
 #define SCAN_BY_KEY_TEST(FN, X, Y, Z, W, Ti, To, INC, DIM, DSTART, DEND, EPS) \
     TEST(ScanByKey, Test_Scan_By_Key_##FN##_##Ti##_##INC##_##DIM) {           \
+        UNSUPPORTED_BACKEND(AF_BACKEND_ONEAPI);                               \
         dim4 dims(X, Y, Z, W);                                                \
         int scanDim = DIM;                                                    \
         int nodel[] = {37, 256};                                              \
@@ -194,6 +195,7 @@ SCAN_BY_KEY_TEST(AF_BINARY_MAX, 4 * 1024, 512, 1, 1, float, float, false, 1, -5,
                  5, 1e-3);
 
 TEST(ScanByKey, Test_Scan_By_key_Simple_0) {
+    UNSUPPORTED_BACKEND(AF_BACKEND_ONEAPI);
     dim4 dims(16, 8, 2, 1);
     int scanDim = 0;
     int nodel[] = {4, 8};
@@ -207,6 +209,7 @@ TEST(ScanByKey, Test_Scan_By_key_Simple_0) {
 }
 
 TEST(ScanByKey, Test_Scan_By_key_Simple_1) {
+    UNSUPPORTED_BACKEND(AF_BACKEND_ONEAPI);
     dim4 dims(8, 256 + 128, 1, 1);
     int scanDim = 1;
     int nodel[] = {4, 8};
@@ -220,6 +223,7 @@ TEST(ScanByKey, Test_Scan_By_key_Simple_1) {
 }
 
 TEST(ScanByKey, FixOverflowWrite) {
+    UNSUPPORTED_BACKEND(AF_BACKEND_ONEAPI);
     const int SIZE = 41000;
     vector<int> keys(SIZE, 0);
     vector<float> vals(SIZE, 1.0f);
@@ -236,3 +240,26 @@ TEST(ScanByKey, FixOverflowWrite) {
 
     ASSERT_EQ(prior, valsAF(0).scalar<float>());
 }
+
+#define TEST_TEMP_FORMAT(form, dim)                                           \
+    TEST(TEMP_FORMAT, form##_Dim##dim) {                                      \
+        UNSUPPORTED_BACKEND(AF_BACKEND_ONEAPI);                               \
+        const dim4 dims(2, 2, 2, 2);                                          \
+        const array in(af::moddims(range(dim4(dims.elements())), dims));      \
+        in.eval();                                                            \
+        const array keys(af::constant(0, dims, u32));                         \
+        keys.eval();                                                          \
+        const array gold = scanByKey(keys, in, dim);                          \
+                                                                              \
+        array out =                                                           \
+            scanByKey(toTempFormat(form, keys), toTempFormat(form, in), dim); \
+        ASSERT_ARRAYS_EQ(gold, out);                                          \
+    }
+
+#define TEST_TEMP_FORMATS(form) \
+    TEST_TEMP_FORMAT(form, 0)   \
+    TEST_TEMP_FORMAT(form, 1)   \
+    TEST_TEMP_FORMAT(form, 2)   \
+    TEST_TEMP_FORMAT(form, 3)
+
+FOREACH_TEMP_FORMAT(TEST_TEMP_FORMATS)

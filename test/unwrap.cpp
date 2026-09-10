@@ -37,11 +37,12 @@ class Unwrap : public ::testing::Test {
 
 // create a list of types to be tested
 typedef ::testing::Types<float, double, cfloat, cdouble, int, unsigned int,
-                         intl, uintl, char, unsigned char, short, ushort>
+                         intl, uintl, char, signed char, unsigned char, short,
+                         ushort>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Unwrap, TestTypes);
+TYPED_TEST_SUITE(Unwrap, TestTypes);
 
 template<typename T>
 void unwrapTest(string pTestFile, const unsigned resultIdx, const dim_t wx,
@@ -50,8 +51,8 @@ void unwrapTest(string pTestFile, const unsigned resultIdx, const dim_t wx,
     SUPPORTED_TYPE_CHECK(T);
 
     vector<dim4> numDims;
-    vector<vector<T> > in;
-    vector<vector<T> > tests;
+    vector<vector<T>> in;
+    vector<vector<T>> tests;
     readTests<T, T, int>(pTestFile, numDims, in, tests);
 
     dim4 idims = numDims[0];
@@ -161,8 +162,8 @@ TEST(Unwrap, CPP) {
     const unsigned py        = 3;
 
     vector<dim4> numDims;
-    vector<vector<float> > in;
-    vector<vector<float> > tests;
+    vector<vector<float>> in;
+    vector<vector<float>> tests;
     readTests<float, float, int>(string(TEST_DIR "/unwrap/unwrap_small.test"),
                                  numDims, in, tests);
 

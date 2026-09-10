@@ -21,6 +21,7 @@
 using af::dim4;
 using std::vector;
 
+namespace arrayfire {
 namespace cpu {
 template<typename T>
 Array<T> meanshift(const Array<T> &in, const float &spatialSigma,
@@ -49,9 +50,11 @@ INSTANTIATE(double)
 INSTANTIATE(char)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
 }  // namespace cpu
+}  // namespace arrayfire

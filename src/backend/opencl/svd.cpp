@@ -24,6 +24,7 @@
 #include <magma/magma_helper.h>
 #include <platform.hpp>
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename Tr>
@@ -87,7 +88,7 @@ void svd(Array<T> &arrU, Array<Tr> &arrS, Array<T> &arrVT, Array<T> &arrA,
     static const double smlnum = std::sqrt(cpu_lapack_lamch('S')) / eps;
     static const double bignum = 1. / smlnum;
 
-    Tr anrm = abs(reduce_all<af_max_t, T, T>(arrA));
+    Tr anrm = abs(getScalar<T>(reduce_all<af_max_t, T, T>(arrA)));
 
     T scale                = scalar<T>(1);
     static const int ione  = 1;
@@ -231,9 +232,11 @@ INSTANTIATE(cfloat, float)
 INSTANTIATE(cdouble, double)
 
 }  // namespace opencl
+}  // namespace arrayfire
 
 #else  // WITH_LINEAR_ALGEBRA
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename T, typename Tr>
@@ -258,5 +261,6 @@ INSTANTIATE(cfloat, float)
 INSTANTIATE(cdouble, double)
 
 }  // namespace opencl
+}  // namespace arrayfire
 
 #endif  // WITH_LINEAR_ALGEBRA

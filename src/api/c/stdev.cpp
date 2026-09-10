@@ -10,6 +10,7 @@
 #include <arith.hpp>
 #include <backend.hpp>
 #include <common/cast.hpp>
+#include <copy.hpp>
 #include <handle.hpp>
 #include <math.hpp>
 #include <mean.hpp>
@@ -25,17 +26,19 @@
 #include "stats.h"
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
 using detail::Array;
 using detail::cdouble;
 using detail::cfloat;
 using detail::createValueArray;
 using detail::division;
+using detail::getScalar;
 using detail::intl;
 using detail::mean;
 using detail::reduce;
 using detail::reduce_all;
 using detail::scalar;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -52,9 +55,9 @@ static outType stdev(const af_array& in, const af_var_bias bias) {
         detail::arithOp<outType, af_sub_t>(input, meanCnst, input.dims());
     Array<outType> diffSq =
         detail::arithOp<outType, af_mul_t>(diff, diff, diff.dims());
-    outType result =
-        division(reduce_all<af_add_t, outType, outType>(diffSq),
-                 (input.elements() - (bias == AF_VARIANCE_SAMPLE)));
+    outType result = division(
+        getScalar<outType>(reduce_all<af_add_t, outType, outType>(diffSq)),
+        (input.elements() - (bias == AF_VARIANCE_SAMPLE)));
     return sqrt(result);
 }
 
@@ -109,6 +112,7 @@ af_err af_stdev_all_v2(double* realVal, double* imagVal, const af_array in,
             case u16: *realVal = stdev<ushort, float>(in, bias); break;
             case s64: *realVal = stdev<intl, double>(in, bias); break;
             case u64: *realVal = stdev<uintl, double>(in, bias); break;
+            case s8: *realVal = stdev<schar, float>(in, bias); break;
             case u8: *realVal = stdev<uchar, float>(in, bias); break;
             case b8: *realVal = stdev<char, float>(in, bias); break;
             // TODO(umar): FIXME: sqrt(complex) is not present in cuda/opencl
@@ -150,6 +154,7 @@ af_err af_stdev_v2(af_array* out, const af_array in, const af_var_bias bias,
             case u16: output = stdev<ushort, float>(in, dim, bias); break;
             case s64: output = stdev<intl, double>(in, dim, bias); break;
             case u64: output = stdev<uintl, double>(in, dim, bias); break;
+            case s8: output = stdev<schar, float>(in, dim, bias); break;
             case u8: output = stdev<uchar, float>(in, dim, bias); break;
             case b8: output = stdev<char, float>(in, dim, bias); break;
             // TODO(umar): FIXME: sqrt(complex) is not present in cuda/opencl

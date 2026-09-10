@@ -15,8 +15,9 @@
 #include <math.hpp>
 #include <stdexcept>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> range(const dim4& dim, const int seq_dim) {
@@ -46,8 +47,10 @@ INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(intl)
 INSTANTIATE(uintl)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(half)
 }  // namespace opencl
+}  // namespace arrayfire

@@ -51,11 +51,11 @@ class Diff2 : public ::testing::Test {
 
 // create a list of types to be tested
 typedef ::testing::Types<float, cfloat, double, cdouble, int, unsigned, intl,
-                         uintl, char, unsigned char, short, ushort>
+                         uintl, char, signed char, unsigned char, short, ushort>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Diff2, TestTypes);
+TYPED_TEST_SUITE(Diff2, TestTypes);
 
 template<typename T>
 void diff2Test(string pTestFile, unsigned dim, bool isSubRef = false,
@@ -64,8 +64,8 @@ void diff2Test(string pTestFile, unsigned dim, bool isSubRef = false,
 
     vector<dim4> numDims;
 
-    vector<vector<T> > in;
-    vector<vector<T> > tests;
+    vector<vector<T>> in;
+    vector<vector<T>> tests;
     readTests<T, T, int>(pTestFile, numDims, in, tests);
     dim4 dims = numDims[0];
 
@@ -153,8 +153,8 @@ void diff2ArgsTest(string pTestFile) {
 
     vector<dim4> numDims;
 
-    vector<vector<T> > in;
-    vector<vector<T> > tests;
+    vector<vector<T>> in;
+    vector<vector<T>> tests;
     readTests<T, T, int>(pTestFile, numDims, in, tests);
     dim4 dims = numDims[0];
 
@@ -209,8 +209,8 @@ TEST(Diff2, CPP) {
     const unsigned dim = 1;
     vector<dim4> numDims;
 
-    vector<vector<float> > in;
-    vector<vector<float> > tests;
+    vector<vector<float>> in;
+    vector<vector<float>> tests;
     readTests<float, float, int>(string(TEST_DIR "/diff2/matrix1.test"),
                                  numDims, in, tests);
     dim4 dims = numDims[0];

@@ -16,6 +16,7 @@
 #include <common/graphics_common.hpp>
 #include <handle.hpp>
 #include <join.hpp>
+#include <platform.hpp>
 #include <reduce.hpp>
 #include <transpose.hpp>
 #include <vector_field.hpp>
@@ -23,36 +24,48 @@
 #include <vector>
 
 using af::dim4;
+using arrayfire::common::ForgeManager;
+using arrayfire::common::ForgeModule;
+using arrayfire::common::forgePlugin;
+using arrayfire::common::getGLType;
+using arrayfire::common::makeContextCurrent;
+using arrayfire::common::step_round;
 using detail::Array;
 using detail::copy_vector_field;
+using detail::createEmptyArray;
 using detail::forgeManager;
 using detail::reduce;
+using detail::schar;
 using detail::transpose;
 using detail::uchar;
 using detail::uint;
 using detail::ushort;
 using std::vector;
 
-using namespace graphics;
-
 template<typename T>
 fg_chart setup_vector_field(fg_window window, const vector<af_array>& points,
                             const vector<af_array>& directions,
                             const af_cell* const props,
                             const bool transpose_ = true) {
-    ForgeModule& _ = graphics::forgePlugin();
+    ForgeModule& _ = forgePlugin();
     vector<Array<T>> pnts;
     vector<Array<T>> dirs;
 
-    for (unsigned i = 0; i < points.size(); ++i) {
-        pnts.push_back(getArray<T>(points[i]));
-        dirs.push_back(getArray<T>(directions[i]));
+    Array<T> pIn = getArray<T>(points[0]);
+    Array<T> dIn = getArray<T>(directions[0]);
+    if (points.size() > 1) {
+        for (unsigned i = 0; i < points.size(); ++i) {
+            pnts.push_back(getArray<T>(points[i]));
+            dirs.push_back(getArray<T>(directions[i]));
+        }
+
+        // Join for set up vector
+        const dim4 odims(pIn.dims()[0], points.size());
+        pIn = createEmptyArray<T>(odims);
+        dIn = createEmptyArray<T>(odims);
+        detail::join<T>(pIn, 1, pnts);
+        detail::join<T>(dIn, 1, dirs);
     }
-
-    // Join for set up vector
-    Array<T> pIn = detail::join(1, pnts);
-    Array<T> dIn = detail::join(1, dirs);
-
     // do transpose if required
     if (transpose_) {
         pIn = transpose<T>(pIn, false);
@@ -171,6 +184,9 @@ af_err vectorFieldWrapper(const af_window window, const af_array points,
             case u16:
                 chart = setup_vector_field<ushort>(window, pnts, dirs, props);
                 break;
+            case s8:
+                chart = setup_vector_field<schar>(window, pnts, dirs, props);
+                break;
             case u8:
                 chart = setup_vector_field<uchar>(window, pnts, dirs, props);
                 break;
@@ -178,7 +194,7 @@ af_err vectorFieldWrapper(const af_window window, const af_array points,
         }
         auto gridDims = forgeManager().getWindowGrid(window);
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         if (props->col > -1 && props->row > -1) {
             FG_CHECK(_.fg_draw_chart_to_cell(
                 window, gridDims.first, gridDims.second,
@@ -277,6 +293,10 @@ af_err vectorFieldWrapper(const af_window window, const af_array xPoints,
                 chart = setup_vector_field<ushort>(window, points, directions,
                                                    props);
                 break;
+            case s8:
+                chart = setup_vector_field<schar>(window, points, directions,
+                                                  props);
+                break;
             case u8:
                 chart = setup_vector_field<uchar>(window, points, directions,
                                                   props);
@@ -285,7 +305,7 @@ af_err vectorFieldWrapper(const af_window window, const af_array xPoints,
         }
         auto gridDims = forgeManager().getWindowGrid(window);
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         if (props->col > -1 && props->row > -1) {
             FG_CHECK(_.fg_draw_chart_to_cell(
                 window, gridDims.first, gridDims.second,
@@ -371,6 +391,10 @@ af_err vectorFieldWrapper(const af_window window, const af_array xPoints,
                 chart = setup_vector_field<ushort>(window, points, directions,
                                                    props);
                 break;
+            case s8:
+                chart = setup_vector_field<schar>(window, points, directions,
+                                                  props);
+                break;
             case u8:
                 chart = setup_vector_field<uchar>(window, points, directions,
                                                   props);
@@ -380,7 +404,7 @@ af_err vectorFieldWrapper(const af_window window, const af_array xPoints,
 
         auto gridDims = forgeManager().getWindowGrid(window);
 
-        ForgeModule& _ = graphics::forgePlugin();
+        ForgeModule& _ = forgePlugin();
         if (props->col > -1 && props->row > -1) {
             FG_CHECK(_.fg_draw_chart_to_cell(
                 window, gridDims.first, gridDims.second,

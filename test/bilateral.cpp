@@ -25,7 +25,7 @@ using std::vector;
 template<typename T, bool isColor>
 void bilateralTest(string pTestFile) {
     SUPPORTED_TYPE_CHECK(T);
-    if (noImageIOTests()) return;
+    IMAGEIO_ENABLED_CHECK();
 
     vector<dim4> inDims;
     vector<string> inFiles;
@@ -73,11 +73,12 @@ TEST(BilateralOnImage, Color) {
 template<typename T>
 class BilateralOnData : public ::testing::Test {};
 
-typedef ::testing::Types<float, double, int, uint, char, uchar, short, ushort>
+typedef ::testing::Types<float, double, int, uint, char, schar, uchar, short,
+                         ushort>
     DataTestTypes;
 
 // register the type list
-TYPED_TEST_CASE(BilateralOnData, DataTestTypes);
+TYPED_TEST_SUITE(BilateralOnData, DataTestTypes);
 
 template<typename inType>
 void bilateralDataTest(string pTestFile) {
@@ -87,8 +88,8 @@ void bilateralDataTest(string pTestFile) {
                                float>::type outType;
 
     vector<dim4> numDims;
-    vector<vector<inType> > in;
-    vector<vector<outType> > tests;
+    vector<vector<inType>> in;
+    vector<vector<outType>> tests;
 
     readTests<inType, outType, float>(pTestFile, numDims, in, tests);
 
@@ -152,8 +153,8 @@ using af::bilateral;
 
 TEST(Bilateral, CPP) {
     vector<dim4> numDims;
-    vector<vector<float> > in;
-    vector<vector<float> > tests;
+    vector<vector<float>> in;
+    vector<vector<float>> tests;
 
     readTests<float, float, float>(string(TEST_DIR "/bilateral/rectangle.test"),
                                    numDims, in, tests);

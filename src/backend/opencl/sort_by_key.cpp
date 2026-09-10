@@ -16,6 +16,7 @@
 #include <sort_by_key.hpp>
 #include <stdexcept>
 
+namespace arrayfire {
 namespace opencl {
 template<typename Tk, typename Tv>
 void sort_by_key(Array<Tk> &okey, Array<Tv> &oval, const Array<Tk> &ikey,
@@ -68,6 +69,7 @@ void sort_by_key(Array<Tk> &okey, Array<Tv> &oval, const Array<Tk> &ikey,
     INSTANTIATE(Tk, short)   \
     INSTANTIATE(Tk, ushort)  \
     INSTANTIATE(Tk, char)    \
+    INSTANTIATE(Tk, schar)   \
     INSTANTIATE(Tk, uchar)   \
     INSTANTIATE(Tk, intl)    \
     INSTANTIATE(Tk, uintl)
@@ -79,7 +81,9 @@ INSTANTIATE1(uint)
 INSTANTIATE1(short)
 INSTANTIATE1(ushort)
 INSTANTIATE1(char)
+INSTANTIATE1(schar)
 INSTANTIATE1(uchar)
 INSTANTIATE1(intl)
 INSTANTIATE1(uintl)
 }  // namespace opencl
+}  // namespace arrayfire

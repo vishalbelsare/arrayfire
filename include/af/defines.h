@@ -227,6 +227,9 @@ typedef enum {
 #if AF_API_VERSION >= 37
     , f16    ///< 16-bit floating point value
 #endif
+#if AF_API_VERSION >= 310
+    , s8     ///< 8-bit signed integral values
+#endif
 } af_dtype;
 
 typedef enum {
@@ -414,7 +417,8 @@ typedef enum {
     AF_BACKEND_DEFAULT = 0,  ///< Default backend order: OpenCL -> CUDA -> CPU
     AF_BACKEND_CPU     = 1,  ///< CPU a.k.a sequential algorithms
     AF_BACKEND_CUDA    = 2,  ///< CUDA Compute Backend
-    AF_BACKEND_OPENCL  = 4   ///< OpenCL Compute Backend
+    AF_BACKEND_OPENCL  = 4,  ///< OpenCL Compute Backend
+    AF_BACKEND_ONEAPI  = 8   ///< OneAPI Compute Backend
 } af_backend;
 #endif
 
@@ -508,8 +512,11 @@ typedef enum {
 } af_diffusion_eq;
 
 typedef enum {
-    AF_TOPK_MIN     = 1,  ///< Top k min values
-    AF_TOPK_MAX     = 2,  ///< Top k max values
+    AF_TOPK_MIN         = 1,  ///< Top k min values
+    AF_TOPK_MAX         = 2,  ///< Top k max values
+    AF_TOPK_STABLE      = 4,  ///< Preserve order of indices for equal values
+    AF_TOPK_STABLE_MIN  = AF_TOPK_STABLE | AF_TOPK_MIN, ///< Top k min with stable indices
+    AF_TOPK_STABLE_MAX  = AF_TOPK_STABLE | AF_TOPK_MAX, ///< Top k max with stable indices
     AF_TOPK_DEFAULT = 0   ///< Default option (max)
 } af_topk_function;
 #endif

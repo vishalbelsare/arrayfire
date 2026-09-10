@@ -14,8 +14,9 @@
 #include <reorder.hpp>
 #include <stdexcept>
 
-using common::half;
+using arrayfire::common::half;
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> reorder(const Array<T> &in, const af::dim4 &rdims) {
@@ -39,6 +40,7 @@ INSTANTIATE(cfloat)
 INSTANTIATE(cdouble)
 INSTANTIATE(int)
 INSTANTIATE(uint)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(char)
 INSTANTIATE(intl)
@@ -47,3 +49,4 @@ INSTANTIATE(short)
 INSTANTIATE(ushort)
 INSTANTIATE(half)
 }  // namespace opencl
+}  // namespace arrayfire

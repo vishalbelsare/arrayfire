@@ -14,6 +14,7 @@
 #include <backend.hpp>
 #include <common/cast.hpp>
 #include <common/err_common.hpp>
+#include <common/tile.hpp>
 #include <complex.hpp>
 #include <convolve.hpp>
 #include <copy.hpp>
@@ -25,7 +26,6 @@
 #include <reduce.hpp>
 #include <scan.hpp>
 #include <sobel.hpp>
-#include <tile.hpp>
 #include <transpose.hpp>
 #include <unary.hpp>
 #include <af/defines.h>
@@ -36,7 +36,8 @@
 #include <vector>
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
+using arrayfire::common::tile;
 using detail::arithOp;
 using detail::Array;
 using detail::convolve2;
@@ -44,6 +45,7 @@ using detail::createEmptyArray;
 using detail::createHostDataArray;
 using detail::createSubArray;
 using detail::createValueArray;
+using detail::getScalar;
 using detail::histogram;
 using detail::iota;
 using detail::ireduce;
@@ -51,6 +53,7 @@ using detail::logicOp;
 using detail::reduce;
 using detail::reduce_all;
 using detail::scan;
+using detail::schar;
 using detail::sobelDerivatives;
 using detail::uchar;
 using detail::uint;
@@ -60,6 +63,7 @@ using std::make_pair;
 using std::pair;
 using std::vector;
 
+namespace {
 Array<float> gradientMagnitude(const Array<float>& gx, const Array<float>& gy,
                                const bool& isf) {
     using detail::abs;
@@ -90,7 +94,6 @@ Array<float> otsuThreshold(const Array<float>& in, const unsigned NUM_BINS,
     seqBegin[0] = af_make_seq(0, static_cast<double>(hDims[0] - 1), 1);
     seqRest[0]  = af_make_seq(0, static_cast<double>(hDims[0] - 1), 1);
 
-    Array<float> TWOS   = createValueArray<float>(oDims, 2.0f);
     Array<float> UnitP  = createValueArray<float>(oDims, 1.0f);
     Array<float> histf  = cast<float, uint>(hist);
     Array<float> totals = createValueArray<float>(hDims, inDims[0] * inDims[1]);
@@ -123,7 +126,7 @@ Array<float> otsuThreshold(const Array<float>& in, const unsigned NUM_BINS,
         auto muL   = arithOp<float, af_div_t>(_muL, qL, oDims);
         auto muH   = arithOp<float, af_div_t>(_muH, qH, oDims);
         auto diff  = arithOp<float, af_sub_t>(muL, muH, oDims);
-        auto sqrd  = arithOp<float, af_pow_t>(diff, TWOS, oDims);
+        auto sqrd  = arithOp<float, af_mul_t>(diff, diff, oDims);
         auto op2   = createSubArray(qLqH, sliceIndex, false);
         auto sigma = arithOp<float, af_mul_t>(sqrd, op2, oDims);
 
@@ -136,7 +139,8 @@ Array<float> otsuThreshold(const Array<float>& in, const unsigned NUM_BINS,
 
     ireduce<af_max_t, float>(thresh, locs, sigmas, 0);
 
-    return cast<float, uint>(tile(locs, dim4(inDims[0], inDims[1])));
+    return cast<float, uint>(
+        arrayfire::common::tile(locs, dim4(inDims[0], inDims[1])));
 }
 
 Array<float> normalize(const Array<float>& supEdges, const float minVal,
@@ -151,7 +155,9 @@ pair<Array<char>, Array<char>> computeCandidates(const Array<float>& supEdges,
                                                  const float t1,
                                                  const af_canny_threshold ct,
                                                  const float t2) {
-    float maxVal  = reduce_all<af_max_t, float, float>(supEdges);
+    float maxVal =
+        getScalar<float>(reduce_all<af_max_t, float, float>(supEdges));
+    ;
     auto NUM_BINS = static_cast<unsigned>(maxVal);
 
     auto lowRatio = createValueArray<float>(supEdges.dims(), t1);
@@ -171,10 +177,11 @@ pair<Array<char>, Array<char>> computeCandidates(const Array<float>& supEdges,
             return make_pair(strong, weak);
         };
         default: {
-            float minVal = reduce_all<af_min_t, float, float>(supEdges);
-            auto normG   = normalize(supEdges, minVal, maxVal);
-            auto T2      = createValueArray<float>(supEdges.dims(), t2);
-            auto T1      = createValueArray<float>(supEdges.dims(), t1);
+            float minVal =
+                getScalar<float>(reduce_all<af_min_t, float, float>(supEdges));
+            auto normG = normalize(supEdges, minVal, maxVal);
+            auto T2    = createValueArray<float>(supEdges.dims(), t2);
+            auto T1    = createValueArray<float>(supEdges.dims(), t1);
             Array<char> weak1 =
                 logicOp<float, af_ge_t>(normG, T1, normG.dims());
             Array<char> weak2 =
@@ -213,6 +220,8 @@ af_array cannyHelper(const Array<T>& in, const float t1,
 
     return getHandle(edgeTrackingByHysteresis(swpair.first, swpair.second));
 }
+
+}  // namespace
 
 af_err af_canny(af_array* out, const af_array in, const af_canny_threshold ct,
                 const float t1, const float t2, const unsigned sw,
@@ -256,6 +265,10 @@ af_err af_canny(af_array* out, const af_array in, const af_canny_threshold ct,
             case u16:
                 output = cannyHelper<ushort>(getArray<ushort>(in), t1, ct, t2,
                                              sw, isf);
+                break;
+            case s8:
+                output = cannyHelper<schar>(getArray<schar>(in), t1, ct, t2, sw,
+                                            isf);
                 break;
             case u8:
                 output = cannyHelper<uchar>(getArray<uchar>(in), t1, ct, t2, sw,

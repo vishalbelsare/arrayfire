@@ -22,17 +22,20 @@
 #include <af/dim4.hpp>
 
 using af::dim4;
-using common::half;
+using arrayfire::castSparse;
+using arrayfire::getHandle;
+using arrayfire::common::half;
 using detail::cdouble;
 using detail::cfloat;
 using detail::intl;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
 using detail::ushort;
 
 static af_array cast(const af_array in, const af_dtype type) {
-    const ArrayInfo& info = getInfo(in, false, true);
+    const ArrayInfo& info = getInfo(in, false);
 
     if (info.getType() == type) { return retain(in); }
 
@@ -52,6 +55,7 @@ static af_array cast(const af_array in, const af_dtype type) {
             case c64: return getHandle(castArray<cdouble>(in));
             case s32: return getHandle(castArray<int>(in));
             case u32: return getHandle(castArray<uint>(in));
+            case s8: return getHandle(castArray<schar>(in));
             case u8: return getHandle(castArray<uchar>(in));
             case b8: return getHandle(castArray<char>(in));
             case s64: return getHandle(castArray<intl>(in));
@@ -66,7 +70,7 @@ static af_array cast(const af_array in, const af_dtype type) {
 
 af_err af_cast(af_array* out, const af_array in, const af_dtype type) {
     try {
-        const ArrayInfo& info = getInfo(in, false, true);
+        const ArrayInfo& info = getInfo(in, false);
 
         af_dtype inType = info.getType();
         if ((inType == c32 || inType == c64) &&

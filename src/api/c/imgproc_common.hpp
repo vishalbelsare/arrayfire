@@ -12,12 +12,14 @@
 #include <arith.hpp>
 #include <backend.hpp>
 #include <common/cast.hpp>
+#include <copy.hpp>
 #include <logic.hpp>
 #include <reduce.hpp>
 #include <scan.hpp>
 
 #include <cmath>
 
+namespace arrayfire {
 namespace common {
 
 template<typename To, typename Ti = To>
@@ -46,9 +48,10 @@ detail::Array<To> convRange(const detail::Array<Ti>& in,
                             const To newLow = To(0), const To newHigh = To(1)) {
     auto dims  = in.dims();
     auto input = common::cast<To, Ti>(in);
-    To high    = detail::reduce_all<af_max_t, To, To>(input);
-    To low     = detail::reduce_all<af_min_t, To, To>(input);
-    To range   = high - low;
+    To high =
+        detail::getScalar<To>(detail::reduce_all<af_max_t, To, To>(input));
+    To low = detail::getScalar<To>(detail::reduce_all<af_min_t, To, To>(input));
+    To range = high - low;
 
     if (std::abs(range) < 1.0e-6) {
         if (low == To(0) && newLow == To(0)) {
@@ -76,3 +79,4 @@ detail::Array<To> convRange(const detail::Array<Ti>& in,
 }
 
 }  // namespace common
+}  // namespace arrayfire

@@ -16,6 +16,7 @@
 #include <sort.hpp>
 #include <stdexcept>
 
+namespace arrayfire {
 namespace opencl {
 template<typename T>
 Array<T> sort(const Array<T> &in, const unsigned dim, bool isAscending) {
@@ -55,6 +56,7 @@ INSTANTIATE(double)
 INSTANTIATE(int)
 INSTANTIATE(uint)
 INSTANTIATE(char)
+INSTANTIATE(schar)
 INSTANTIATE(uchar)
 INSTANTIATE(short)
 INSTANTIATE(ushort)
@@ -62,3 +64,4 @@ INSTANTIATE(intl)
 INSTANTIATE(uintl)
 
 }  // namespace opencl
+}  // namespace arrayfire

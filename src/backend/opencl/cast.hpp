@@ -18,6 +18,7 @@
 #include <af/dim4.hpp>
 #include <complex>
 
+namespace arrayfire {
 namespace opencl {
 
 template<typename To, typename Ti>
@@ -36,6 +37,11 @@ CAST_FN(uint)
 CAST_FN(uchar)
 CAST_FN(float)
 CAST_FN(double)
+
+template<typename Ti>
+struct CastOp<schar, Ti> {
+    const char *name() { return "convert_char"; }
+};
 
 #define CAST_CFN(TYPE)                                    \
     template<typename Ti>                                 \
@@ -71,3 +77,4 @@ struct CastOp<cdouble, cdouble> {
 #undef CAST_CFN
 
 }  // namespace opencl
+}  // namespace arrayfire

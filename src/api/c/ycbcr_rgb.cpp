@@ -20,6 +20,7 @@
 using af::dim4;
 using detail::arithOp;
 using detail::Array;
+using detail::createEmptyArray;
 using detail::createValueArray;
 using detail::join;
 using detail::scalar;
@@ -68,7 +69,7 @@ static af_array convert(const af_array& in, const af_ycc_std standard) {
     static const float INV_219 = 0.004566210;
     static const float INV_112 = 0.008928571;
     const static float k[6]    = {0.1140f, 0.2990f, 0.0722f,
-                               0.2126f, 0.0593f, 0.2627f};
+                                  0.2126f, 0.0593f, 0.2627f};
     unsigned stdIdx            = 0;  // Default standard is AF_YCC_601
     switch (standard) {
         case AF_YCC_709: stdIdx = 2; break;
@@ -108,7 +109,10 @@ static af_array convert(const af_array& in, const af_ycc_std standard) {
                    INV_112 * (kb - 1) * kb * invKl);
         Array<T> B = mix<T>(Y_, Cb_, INV_219, INV_112 * (1 - kb));
         // join channels
-        return getHandle(join<T>(2, {R, G, B}));
+        dim4 odims(R.dims()[0], R.dims()[1], 3);
+        Array<T> rgbout = createEmptyArray<T>(odims);
+        join<T>(rgbout, 2, {R, G, B});
+        return getHandle(rgbout);
     }
     Array<T> Ey = mix<T>(X, Y, Z, kr, kl, kb);
     Array<T> Ecr =
@@ -119,7 +123,10 @@ static af_array convert(const af_array& in, const af_ycc_std standard) {
     Array<T> Cr = digitize<T>(Ecr, 224.0, 128.0);
     Array<T> Cb = digitize<T>(Ecb, 224.0, 128.0);
     // join channels
-    return getHandle(join<T>(2, {Y_, Cb, Cr}));
+    dim4 odims(Y_.dims()[0], Y_.dims()[1], 3);
+    Array<T> ycbcrout = createEmptyArray<T>(odims);
+    join<T>(ycbcrout, 2, {Y_, Cb, Cr});
+    return getHandle(ycbcrout);
 }
 
 template<bool isYCbCr2RGB>

@@ -71,7 +71,7 @@ namespace af
             operator array() const;
             operator array();
 
-#define ASSIGN(OP)                                                  \
+#define ASSIGN_(OP)                                                 \
             array_proxy& operator OP(const array_proxy &a);         \
             array_proxy& operator OP(const array &a);               \
             array_proxy& operator OP(const double &a);              \
@@ -88,17 +88,25 @@ namespace af
             array_proxy& operator OP(const long long  &a);          \
             array_proxy& operator OP(const unsigned long long &a);
 
-            ASSIGN(=)
-            ASSIGN(+=)
-            ASSIGN(-=)
-            ASSIGN(*=)
-            ASSIGN(/=)
-#undef ASSIGN
-
 #if AF_API_VERSION >= 32
-#define ASSIGN(OP)                                                  \
+#define ASSIGN_32(OP)                                               \
             array_proxy& operator OP(const short &a);               \
             array_proxy& operator OP(const unsigned short &a);
+#else
+#define ASSIGN_32(OP)
+#endif
+
+#if AF_API_VERSION >= 310
+#define ASSIGN_310(OP)                                              \
+            array_proxy& operator OP(const signed char &a);
+#else
+#define ASSIGN_310(OP)
+#endif
+
+#define ASSIGN(OP)              \
+            ASSIGN_(OP)         \
+            ASSIGN_32(OP)       \
+            ASSIGN_310(OP)
 
             ASSIGN(=)
             ASSIGN(+=)
@@ -106,7 +114,9 @@ namespace af
             ASSIGN(*=)
             ASSIGN(/=)
 #undef ASSIGN
-#endif
+#undef ASSIGN_
+#undef ASSIGN_32
+#undef ASSIGN_310
 
             // af::array member functions. same behavior as those below
             af_array get();
@@ -246,6 +256,7 @@ namespace af
                        (default is f32)
 
         */
+        explicit
         array(dim_t dim0, dtype ty = f32);
 
         /**
@@ -271,6 +282,7 @@ namespace af
                        (default is f32)
 
         */
+        explicit
         array(dim_t dim0, dim_t dim1, dtype ty = f32);
 
         /**
@@ -297,6 +309,7 @@ namespace af
                        (default is f32)
 
         */
+        explicit
         array(dim_t dim0, dim_t dim1, dim_t dim2, dtype ty = f32);
 
         /**
@@ -324,6 +337,7 @@ namespace af
                        (default is f32)
 
         */
+        explicit
         array(dim_t dim0, dim_t dim1, dim_t dim2, dim_t dim3, dtype ty = f32);
 
         /**
@@ -368,10 +382,10 @@ namespace af
 
             array A(4, h_buffer);   // copy host data to device
                                     //
-                                    // A = 23
-                                    //   = 34
-                                    //   = 18
-                                    //   = 99
+                                    // A = [23]
+                                    //     [34]
+                                    //     [18]
+                                    //     [99]
 
             \endcode
 
@@ -382,6 +396,7 @@ namespace af
 
         */
         template<typename T>
+        explicit
         array(dim_t dim0,
               const T *pointer, af::source src=afHost);
 
@@ -409,6 +424,7 @@ namespace af
                   format when performing linear algebra operations.
         */
         template<typename T>
+        explicit
         array(dim_t dim0, dim_t dim1,
               const T *pointer, af::source src=afHost);
 
@@ -440,6 +456,7 @@ namespace af
             \image html 3dArray.png
         */
         template<typename T>
+        explicit
         array(dim_t dim0, dim_t dim1, dim_t dim2,
               const T *pointer, af::source src=afHost);
 
@@ -473,6 +490,7 @@ namespace af
 
         */
         template<typename T>
+        explicit
         array(dim_t dim0, dim_t dim1, dim_t dim2, dim_t dim3,
               const T *pointer, af::source src=afHost);
 
@@ -522,7 +540,9 @@ namespace af
 #if AF_API_VERSION >= 38
 #if AF_COMPILER_CXX_GENERALIZED_INITIALIZERS
         /// \brief Initializer list constructor
-        template <typename T> array(std::initializer_list<T> list)
+        template <typename T, typename = typename std::enable_if<
+                                  std::is_fundamental<T>::value, void>::type>
+        array(std::initializer_list<T> list)
         : arr(nullptr) {
           dim_t size = list.size();
           if (af_err __aferr = af_create_array(&arr, list.begin(), 1, &size,
@@ -537,7 +557,8 @@ namespace af
         }
 
         /// \brief Initializer list constructor
-        template <typename T>
+        template <typename T, typename = typename std::enable_if<
+                                  std::is_fundamental<T>::value, void>::type>
         array(const af::dim4 &dims, std::initializer_list<T> list)
             : arr(nullptr) {
           const dim_t *size = dims.get();
@@ -644,6 +665,7 @@ namespace af
 
         /**
            Perform deep copy from host/device pointer to an existing array
+           \note Unlike all other assignment operations, this does NOT result in a copy on write.
         */
         template<typename T> void write(const T *ptr, const size_t bytes, af::source src = afHost);
 
@@ -750,8 +772,8 @@ namespace af
         bool isfloating() const;
 
         /**
-           \brief Returns true if the array type is \ref u8, \ref b8, \ref s32
-                  \ref u32, \ref s64, \ref u64, \ref s16, \ref u16
+           \brief Returns true if the array type is \ref s8, \ref u8, \ref b8,
+                  \ref s32, \ref u32, \ref s64, \ref u64, \ref s16, \ref u16
         */
         bool isinteger() const;
 
@@ -933,9 +955,35 @@ namespace af
         const array::array_proxy slices(int first, int last) const; ///< \copydoc slices
         /// @}
 
-        /// \brief Converts the array into another type
+        /// \brief Casts the array into another data type
         ///
-        ///  \param[in] type is the desired type(f32, s64, etc.)
+        /// \note Consecutive casting operations may be optimized out if
+        /// the original type of the af::array is the same as the final type.
+        /// For example if the original type is f64 which is then cast to f32
+        /// and then back to f64, then the cast to f32 will be skipped and that
+        /// operation will *NOT* be performed by ArrayFire. The following table
+        /// shows which casts will be optimized out. outer -> inner -> outer
+        /// | inner-> | f32 | f64 | c32 | c64 | s32 | u32 | s8 | u8 | b8 | s64 | u64 | s16 | u16 | f16 |
+        /// |---------|-----|-----|-----|-----|-----|-----|----|----|----|-----|-----|-----|-----|-----|
+        /// | f32     | x   | x   | x   | x   |     |     |    |    |    |     |     |     |     | x   |
+        /// | f64     | x   | x   | x   | x   |     |     |    |    |    |     |     |     |     | x   |
+        /// | c32     | x   | x   | x   | x   |     |     |    |    |    |     |     |     |     | x   |
+        /// | c64     | x   | x   | x   | x   |     |     |    |    |    |     |     |     |     | x   |
+        /// | s32     | x   | x   | x   | x   | x   | x   |    |    |    | x   | x   |     |     | x   |
+        /// | u32     | x   | x   | x   | x   | x   | x   |    |    |    | x   | x   |     |     | x   |
+        /// | s8      | x   | x   | x   | x   | x   | x   | x  | x  | x  | x   | x   | x   | x   | x   |
+        /// | u8      | x   | x   | x   | x   | x   | x   | x  | x  | x  | x   | x   | x   | x   | x   |
+        /// | b8      | x   | x   | x   | x   | x   | x   | x  | x  | x  | x   | x   | x   | x   | x   |
+        /// | s64     | x   | x   | x   | x   |     |     |    |    |    | x   | x   |     |     | x   |
+        /// | u64     | x   | x   | x   | x   |     |     |    |    |    | x   | x   |     |     | x   |
+        /// | s16     | x   | x   | x   | x   | x   | x   |    |    |    | x   | x   | x   | x   | x   |
+        /// | u16     | x   | x   | x   | x   | x   | x   |    |    |    | x   | x   | x   | x   | x   |
+        /// | f16     | x   | x   | x   | x   |     |     |    |    |    |     |     |     |     | x   |
+        /// If you want to avoid this behavior use af_eval after the first cast
+        /// operation. This will ensure that the cast operation is performed on
+        /// the af::array
+        ///
+        /// \param[in] type is the desired type(f32, s64, etc.)
         /// \returns an array with the type specified by \p type
         const array as(dtype type) const;
 
@@ -967,17 +1015,25 @@ namespace af
         array& OP2(const long long  &val);          /**< \copydoc OP2##(const array &) */ \
         array& OP2(const unsigned long long &val);
 
-
 #if AF_API_VERSION >= 32
-#define ASSIGN(OP)                                                                        \
-        ASSIGN_(OP)                                                                       \
-          array& OP(const short  &val);              /**< \copydoc OP##(const array &) */ \
-          array& OP(const unsigned short &val);
-
+#define ASSIGN_32(OP)                                                                    \
+        array& OP(const short  &val);               /**< \copydoc OP##(const array &) */ \
+        array& OP(const unsigned short &val);
 #else
-#define ASSIGN(OP) ASSIGN_(OP)
+#define ASSIGN_32(OP)
 #endif
 
+#if AF_API_VERSION >= 310
+#define ASSIGN_310(OP)                                                                   \
+        array& OP(const signed char &val);          /**< \copydoc OP##(const array &) */
+#else
+#define ASSIGN_310(OP)
+#endif
+
+#define ASSIGN(OP)          \
+        ASSIGN_(OP)         \
+        ASSIGN_32(OP)       \
+        ASSIGN_310(OP)
 
         /// \ingroup array_mem_operator_eq
         /// @{
@@ -1043,6 +1099,8 @@ namespace af
 
 #undef ASSIGN
 #undef ASSIGN_
+#undef ASSIGN_32
+#undef ASSIGN_310
 
         ///
         /// \brief Negates the values of the array
@@ -1131,16 +1189,28 @@ namespace af
     AFAPI array OP (const array& lhs, const cdouble& rhs);
 
 #if AF_API_VERSION >= 32
-#define BIN_OP(OP)                                                                                                        \
-        BIN_OP_(OP)                                                                                                       \
+#define BIN_OP_32(OP)                                                                                                    \
         AFAPI array OP (const short& lhs, const array& rhs);           /**< \copydoc OP##(const array&, const array&) */ \
         AFAPI array OP (const unsigned short& lhs, const array& rhs);  /**< \copydoc OP##(const array&, const array&) */ \
         AFAPI array OP (const array& lhs, const short& rhs);           /**< \copydoc OP##(const array&, const array&) */ \
         AFAPI array OP (const array& lhs, const unsigned short& rhs);
 
 #else
-#define BIN_OP(OP) BIN_OP_(OP)
+#define BIN_OP_32(OP)
 #endif
+
+#if AF_API_VERSION >= 310
+#define BIN_OP_310(OP)                                                                                                  \
+    AFAPI array OP (const signed char& lhs, const array& rhs);        /**< \copydoc OP##(const array&, const array&) */ \
+    AFAPI array OP (const array& lhs, const signed char& rhs);        /**< \copydoc OP##(const array&, const array&) */
+#else
+#define BIN_OP_310(OP)
+#endif
+
+#define BIN_OP(OP)          \
+        BIN_OP_(OP)         \
+        BIN_OP_32(OP)       \
+        BIN_OP_310(OP)
 
     /// \ingroup arith_func_add
     /// @{
@@ -1335,6 +1405,8 @@ namespace af
 
 #undef BIN_OP
 #undef BIN_OP_
+#undef BIN_OP_32
+#undef BIN_OP_310
 
     /// \ingroup arith_func_bitand
     /// @{
@@ -1357,6 +1429,7 @@ namespace af
     AFAPI array operator&(const array& lhs, const long long& rhs);
     AFAPI array operator&(const array& lhs, const long& rhs);
     AFAPI array operator&(const array& lhs, const short& rhs);
+    AFAPI array operator&(const array& lhs, const signed char& rhs);
     AFAPI array operator&(const array& lhs, const unsigned char& rhs);
     AFAPI array operator&(const array& lhs, const unsigned long long& rhs);
     AFAPI array operator&(const array& lhs, const unsigned long& rhs);
@@ -1372,6 +1445,7 @@ namespace af
     AFAPI array operator&(const long long& lhs, const array& rhs);
     AFAPI array operator&(const long& lhs, const array& rhs);
     AFAPI array operator&(const short& lhs, const array& rhs);
+    AFAPI array operator&(const signed char& lhs, const array& rhs);
     AFAPI array operator&(const unsigned char& lhs, const array& rhs);
     AFAPI array operator&(const unsigned long long& lhs, const array& rhs);
     AFAPI array operator&(const unsigned long& lhs, const array& rhs);
@@ -1400,6 +1474,7 @@ namespace af
     AFAPI array operator&&(const array& lhs, const long long& rhs);
     AFAPI array operator&&(const array& lhs, const long& rhs);
     AFAPI array operator&&(const array& lhs, const short& rhs);
+    AFAPI array operator&&(const array& lhs, const signed char& rhs);
     AFAPI array operator&&(const array& lhs, const unsigned char& rhs);
     AFAPI array operator&&(const array& lhs, const unsigned long long& rhs);
     AFAPI array operator&&(const array& lhs, const unsigned long& rhs);
@@ -1415,6 +1490,7 @@ namespace af
     AFAPI array operator&&(const long long& lhs, const array& rhs);
     AFAPI array operator&&(const long& lhs, const array& rhs);
     AFAPI array operator&&(const short& lhs, const array& rhs);
+    AFAPI array operator&&(const signed char& lhs, const array& rhs);
     AFAPI array operator&&(const unsigned char& lhs, const array& rhs);
     AFAPI array operator&&(const unsigned long long& lhs, const array& rhs);
     AFAPI array operator&&(const unsigned long& lhs, const array& rhs);

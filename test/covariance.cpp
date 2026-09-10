@@ -34,12 +34,12 @@ class Covariance : public ::testing::Test {
 };
 
 // create a list of types to be tested
-typedef ::testing::Types<float, double, int, uint, intl, uintl, uchar, short,
-                         ushort>
+typedef ::testing::Types<float, double, int, uint, intl, uintl, schar, uchar,
+                         short, ushort>
     TestTypes;
 
 // register the type list
-TYPED_TEST_CASE(Covariance, TestTypes);
+TYPED_TEST_SUITE(Covariance, TestTypes);
 
 template<typename T>
 struct f32HelperType {
@@ -65,9 +65,9 @@ template<typename T>
 struct covOutType {
     typedef typename cond_type<
         is_same_type<T, float>::value || is_same_type<T, int>::value ||
-            is_same_type<T, uint>::value || is_same_type<T, uchar>::value ||
-            is_same_type<T, short>::value || is_same_type<T, ushort>::value ||
-            is_same_type<T, char>::value,
+            is_same_type<T, uint>::value || is_same_type<T, schar>::value ||
+            is_same_type<T, uchar>::value || is_same_type<T, short>::value ||
+            is_same_type<T, ushort>::value || is_same_type<T, char>::value,
         float, typename elseType<T>::type>::type type;
 };
 
@@ -79,8 +79,8 @@ void covTest(string pFileName, bool isbiased = true,
     SUPPORTED_TYPE_CHECK(outType);
 
     vector<dim4> numDims;
-    vector<vector<int> > in;
-    vector<vector<float> > tests;
+    vector<vector<int>> in;
+    vector<vector<float>> tests;
 
     readTestsFromFile<int, float>(pFileName, numDims, in, tests);
 

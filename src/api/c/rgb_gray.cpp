@@ -17,18 +17,20 @@
 #include <backend.hpp>
 #include <common/ArrayInfo.hpp>
 #include <common/cast.hpp>
+#include <common/tile.hpp>
 #include <handle.hpp>
 #include <join.hpp>
 #include <math.hpp>
-#include <tile.hpp>
 
 using af::dim4;
-using common::cast;
+using arrayfire::common::cast;
 using detail::arithOp;
 using detail::Array;
+using detail::createEmptyArray;
 using detail::createValueArray;
 using detail::join;
 using detail::scalar;
+using detail::schar;
 using detail::uchar;
 using detail::uint;
 using detail::ushort;
@@ -74,7 +76,7 @@ static af_array gray2rgb(const af_array& in, const float r, const float g,
                          const float b) {
     if (r == 1.0 && g == 1.0 && b == 1.0) {
         dim4 tileDims(1, 1, 3, 1);
-        return getHandle(tile(getArray<T>(in), tileDims));
+        return getHandle(arrayfire::common::tile(getArray<T>(in), tileDims));
     }
 
     af_array mod_input = 0;
@@ -96,7 +98,10 @@ static af_array gray2rgb(const af_array& in, const float r, const float g,
     AF_CHECK(af_release_array(mod_input));
 
     // join channels
-    return getHandle(join<cType>(2, {expr3, expr1, expr2}));
+    dim4 odims(expr1.dims()[0], expr1.dims()[1], 3);
+    Array<cType> out = createEmptyArray<cType>(odims);
+    join<cType>(out, 2, {expr3, expr1, expr2});
+    return getHandle(out);
 }
 
 template<typename T, typename cType, bool isRGB2GRAY>
@@ -152,6 +157,9 @@ af_err convert(af_array* out, const af_array in, const float r, const float g,
                 break;
             case u8:
                 output = convert<uchar, float, isRGB2GRAY>(in, r, g, b);
+                break;
+            case s8:
+                output = convert<schar, float, isRGB2GRAY>(in, r, g, b);
                 break;
             default: TYPE_ERROR(1, iType); break;
         }
